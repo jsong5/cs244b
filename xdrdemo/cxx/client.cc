@@ -32,11 +32,11 @@ main(int argc, char **argv)
 
   else if (argc == 3) {
 
-    double startTime = CycleTimer::currentSeconds();
+    // double startTime = CycleTimer::currentSeconds();
     
     std::unique_ptr<Status> stat = client.kv_put(Key(argv[1]), Value(argv[2]));
 
-    double endTime = CycleTimer::currentSeconds();
+    // double endTime = CycleTimer::currentSeconds();
 
 
 
