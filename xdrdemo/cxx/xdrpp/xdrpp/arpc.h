@@ -8,6 +8,7 @@
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
 #include <xdrpp/srpc.h>	     // XXX xdr_trace_client
+#include "CycleTimer.h"
 
 namespace xdr {
 
@@ -41,11 +42,13 @@ public:
   template<typename P, typename...A>
   void invoke(const A &...a,
 	      std::function<void(call_result<typename P::res_type>)> cb) {
-    rpc_msg hdr { s_.get_xid(), CALL };
+    //rpc_msg hdr { s_.get_xid(),1000,CALL };
+    rpc_msg hdr { s_.get_xid(),CycleTimer::currentTicks(),CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
     hdr.body.cbody().vers = P::interface_type::version;
     hdr.body.cbody().proc = P::proc;
+    //hdr.body.cbody().tracing = 1000;
 
     if (xdr_trace_client) {
       std::string s = "CALL ";
@@ -53,41 +56,50 @@ public:
       s += " -> [xid ";
       s += std::to_string(hdr.xid);
       s += "]";
+      s += " -> [tracing ";
+      s += std::to_string(hdr.tracing);
+      s += "]";
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
 
     s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
-	if (!m)
-	  return cb(rpc_call_stat::NETWORK_ERROR);
-	try {
-	  xdr_get g(m);
-	  rpc_msg hdr;
-	  archive(g, hdr);
-	  call_result<typename P::res_type> res(hdr);
-	  if (res)
-	    archive(g, *res);
-	  g.done();
+      if (!m)
+        return cb(rpc_call_stat::NETWORK_ERROR);
+      try {
+        xdr_get g(m);
+        rpc_msg hdr;
+        archive(g, hdr);
+        call_result<typename P::res_type> res(hdr);
+        if (res)
+        {
+          std::cout << "res :  " << *res<<std::endl;
+          archive(g, *res);
+        }
+        g.done();
 
-	  if (xdr_trace_client) {
-	    std::string s = "REPLY ";
-	    s += P::proc_name();
-	    s += " <- [xid " + std::to_string(hdr.xid) + "]";
-	    if (res)
-	      std::clog << xdr_to_string(*res, s.c_str());
-	    else {
-	      s += ": ";
-	      s += res.message();
-	      s += "\n";
-	      std::clog << s;
-	    }
-	  }
-
-	  cb(std::move(res));
-	}
-	catch (const xdr_runtime_error &e) {
-	  cb(rpc_call_stat::GARBAGE_RES);
-	}
-      });
+        if (xdr_trace_client) {
+          std::string s = "REPLY ";
+          s += P::proc_name();
+          s += " <- [xid " + std::to_string(hdr.xid) + "]";
+          s += " -> [tracing ";
+          s += std::to_string(hdr.tracing);
+          s += "]";
+          if (res)
+            std::clog << xdr_to_string(*res, s.c_str());
+          else {
+            s += ": ";
+            s += res.message();
+            s += "\n";
+            std::clog << s;
+          }
+        }
+        std::cout << "invoke :  " << *res<<std::endl;
+        cb(std::move(res));
+      }
+      catch (const xdr_runtime_error &e) {
+        cb(rpc_call_stat::GARBAGE_RES);
+      }
+    });
   }
 
   asynchronous_client_base *operator->() { return this; }
@@ -119,6 +131,7 @@ public:
 private:
   void send_reply_msg(msg_ptr &&b) {
     assert(cb_);		// If this fails you replied twice
+    std::cout << "send_reply_msg : b size"<<b->size() << std::endl;  
     cb_(std::move(b));
     cb_ = nullptr;
   }
@@ -128,9 +141,13 @@ private:
       std::string s = "REPLY ";
       s += proc_name_;
       s += " -> [xid " + std::to_string(xid_) + "]";
+      //s += " -> [tracing ";
+      //s += std::to_string(hdr.tracing);
+      //s += "]";
       std::clog << xdr_to_string(t, s.c_str());
     }
-    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_), t));
+    //send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_,1000), t));
+    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_,CycleTimer::currentTicks()), t));
   }
 
   void reject(accept_stat stat) {
@@ -186,11 +203,15 @@ public:
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
-
+    
+    //hdr.body.cbody().tracing = 1000;
     if (xdr_trace_server) {
       std::string s = "CALL ";
       s += P::proc_name();
       s += " <- [xid " + std::to_string(hdr.xid) + "]";
+      s += " -> [tracing ";
+      s += std::to_string(hdr.tracing);
+      s += "]";
       std::clog << xdr_to_string(arg, s.c_str());
     }
 

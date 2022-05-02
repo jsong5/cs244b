@@ -8,11 +8,12 @@
 
 namespace xdr {
 
-bool xdr_trace_client = std::getenv("XDR_TRACE_CLIENT");
+bool xdr_trace_client = true;//std::getenv("XDR_TRACE_CLIENT");
 
 static ssize_t
 fullread(sock_t s, void *buf, size_t n)
 {
+  std::cout << "fullread " << std::endl;
   char *p = static_cast<char *>(buf);
   while (n > 0) {
     ssize_t nread = read(s, p, n);
@@ -29,6 +30,7 @@ fullread(sock_t s, void *buf, size_t n)
 msg_ptr
 read_message(sock_t s)
 {
+  std::cout << "read_message " << std::endl;
   std::uint32_t len;
   ssize_t n = fullread(s, &len, 4);
   if (n == -1)
@@ -57,6 +59,7 @@ read_message(sock_t s)
 void
 write_message(sock_t s, const msg_ptr &m)
 {
+   std::cout << "write_message " << std::endl;
   ssize_t n = write(s, m->raw_data(), m->raw_size());
   if (n == -1)
     throw xdr_system_error("xdr::write_message");
@@ -71,17 +74,20 @@ uint32_t xid_counter;
 void
 prepare_call(uint32_t prog, uint32_t vers, uint32_t proc, rpc_msg &hdr)
 {
+  std::cout << "prepare_call " << std::endl;
   hdr.xid = ++xid_counter;
   hdr.body.mtype(CALL);
   hdr.body.cbody().rpcvers = 2;
   hdr.body.cbody().prog = prog;
   hdr.body.cbody().vers = vers;
   hdr.body.cbody().proc = proc;
+  //hdr.body.cbody().tracing = 1000;
 }
 
 void
 srpc_server::run()
 {
+  std::cout << "srpc_server::run " << std::endl;
   for (;;)
     dispatch(nullptr, read_message(s_),
 	     std::bind(write_message, s_, std::placeholders::_1));
