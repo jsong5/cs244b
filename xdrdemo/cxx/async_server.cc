@@ -18,6 +18,7 @@ KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
   vals_[*k] = *v;
+  std::cout << "Sever Side SET Key :" << *k << "Value : "<<vals_[*k]<< std::endl;
   cb(SUCCESS); // return value. Stands for callback I think
 }
 
@@ -26,11 +27,13 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 {
   
   auto iter = vals_.find(*k);
+
   if (iter == vals_.end()) {
     GetRes res(NOTFOUND); // initialize the proper type for the result. Also initializes the other type in the union
     cb(res);
   }
   else {
+      std::cout << "Sever Side GET Key :" << *k << "Value : "<<iter->second<< std::endl;
     GetRes res(SUCCESS);	// (Redundant, 0 is default)
     res.value() = iter->second;
     cb(res);
