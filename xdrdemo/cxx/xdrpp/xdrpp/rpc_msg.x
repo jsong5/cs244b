@@ -93,6 +93,7 @@ struct accepted_reply {
   case SUCCESS:
     struct {
       unsigned hyper duds;
+      opaque porrky<8>;
       opaque results[0];
     } success;
     /*
