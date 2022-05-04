@@ -33,7 +33,7 @@ template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {
   static constexpr bool is_class = true;
   static constexpr bool is_struct = true;
   static constexpr bool has_fixed_size = true;
-  static constexpr std::size_t fixed_size = 24 + 8;
+  static constexpr std::size_t fixed_size = 24 + 8 + 4 + 8;
   static constexpr std::size_t serial_size(const rpc_success_hdr &) {
     return fixed_size;
   }
@@ -46,6 +46,9 @@ template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {
     archive(a, uint32_t(0), "body");
     archive(a, SUCCESS, "stat");
     archive(a, uint64_t(0), "duds");
+    xstring<8> alpha = "Porky";
+    std::cerr << "size: " << alpha.max_size() << std::endl;
+    archive(a, alpha, "porrky");
   }
 };
 

@@ -48,7 +48,7 @@ public:
     rpc_msg hdr;
     prepare_call<P>(hdr);
     uint32_t xid = hdr.xid;
-
+    
     if (xdr_trace_client) {
       std::string s = "CALL ";
       s += P::proc_name();
@@ -63,8 +63,10 @@ public:
     check_call_hdr(hdr);
     if (hdr.xid != xid)
       throw xdr_runtime_error("synchronous_client: unexpected xid");
-
+    
     pointer<typename P::res_wire_type> r;
+    std::cerr << hdr.body.rbody().areply() << std::endl;
+    std::cerr << hdr.body.rbody().areply().reply_data.success().porrky.data() << std::endl;
     archive(g, r.activate());
     g.done();
     if (xdr_trace_client) {
