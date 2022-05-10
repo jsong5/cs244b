@@ -7,6 +7,7 @@
 
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
+#include "../CycleTimer.h"
 
 namespace xdr {
 
@@ -46,6 +47,8 @@ public:
     std::unique_ptr<typename P::res_type>>::type
   invoke(const A &...a) {
     rpc_msg hdr;
+    double_t start_time = CycleTimer::currentSeconds();
+    std::cout << "[invoke] start_time: " << start_time << std::endl;
     prepare_call<P>(hdr);
     uint32_t xid = hdr.xid;
     
@@ -65,8 +68,8 @@ public:
       throw xdr_runtime_error("synchronous_client: unexpected xid");
     
     pointer<typename P::res_wire_type> r;
-    std::cerr << hdr.body.rbody().areply() << std::endl;
-    std::cerr << hdr.body.rbody().areply().reply_data.success().porrky.data() << std::endl;
+    std::cerr << "[invoke] reply body: " << hdr.body.rbody().areply() << std::endl;
+    std::cerr << "[invoke] path: " << hdr.body.rbody().areply().reply_data.success().path.data() << std::endl;
     archive(g, r.activate());
     g.done();
     if (xdr_trace_client) {
@@ -151,7 +154,7 @@ public:
       std::clog << xdr_to_string(*res, s.c_str());
     }
 
-    reply(xdr_to_msg(rpc_success_hdr(hdr.xid), *res));
+    reply(xdr_to_msg(rpc_success_hdr(hdr.xid, CycleTimer::currentSeconds(), "/S1/"), *res));
   }
 };
 

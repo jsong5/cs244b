@@ -18,7 +18,7 @@ KVPROT1_server::kv_put(const Key &k, const Value &v)
   double startTime = CycleTimer::currentSeconds();
   auto res = std::make_unique<Status>(SUCCESS);
   vals_[k] = v;
-  sleep(5);
+  sleep(1);
   double endTime = CycleTimer::currentSeconds();
   double totalTime = endTime - startTime;
   std::cerr << "Put time: " << totalTime << std::endl;
