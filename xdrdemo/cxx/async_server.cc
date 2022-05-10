@@ -6,6 +6,7 @@
 // be we don't have to in a more complex server.)
 
 #include "async_server.h"
+#include "CycleTimer.h"
 
 void
 KVPROT1_server::kv_null(xdr::reply_cb<void> cb)
@@ -17,14 +18,28 @@ void
 KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
+  std::string& path = cb.get_path();
+  std::clog << "[kv_put] cb path: " << cb.get_path() << std::endl;
+  path = "P" + path;
+  std::clog << "[kv_put] modified cb path: " << cb.get_path() << std::endl;
+
+  double startTime = CycleTimer::currentSeconds();
   vals_[*k] = *v;
+  sleep(1);
+  double endTime = CycleTimer::currentSeconds();
+  std::clog << "[kv_put] Time: " << (endTime - startTime) << std::endl;
   cb(SUCCESS); // return value. Stands for callback I think
 }
 
 void
 KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use 
 {
-  
+  std::string& path = cb.get_path();
+  std::clog << "[kv_get] cb path: " << cb.get_path() << std::endl;
+  path = "G" + path;
+  std::clog << "[kv_get] modified cb path: " << cb.get_path() << std::endl;
+
+  double startTime = CycleTimer::currentSeconds();
   auto iter = vals_.find(*k);
   if (iter == vals_.end()) {
     GetRes res(NOTFOUND); // initialize the proper type for the result. Also initializes the other type in the union
@@ -35,8 +50,8 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
     res.value() = iter->second;
     cb(res);
   }
-
-
+  double endTime = CycleTimer::currentSeconds();
+  std::clog << "[kv_get] Time: " << (endTime - startTime) << std::endl;
 }
 
 int

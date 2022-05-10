@@ -29,7 +29,7 @@ struct rpc_success_hdr {
   double_t e_time_;
   std::string_view path_;
   explicit constexpr rpc_success_hdr(uint32_t x)
-                    : xid(x), e_time_(0.0), path_("/EMPTY/") {}
+                    : xid(x), e_time_(0.0), path_("/S0/") {}
   explicit constexpr rpc_success_hdr(uint32_t x, double_t end_time, std::string_view path)
                     : xid(x), e_time_(end_time), path_(path) {}
 };
@@ -38,12 +38,14 @@ template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {
   static constexpr bool is_class = true;
   static constexpr bool is_struct = true;
   static constexpr bool has_fixed_size = true;
-  static constexpr std::size_t fixed_size = 40;
+  static constexpr std::size_t fixed_size = 40; // Remove constexpr of fixed_size
+  // fixed_size is dependent on path_ length. Always needs 4 more bytes for padding?
   static constexpr std::size_t serial_size(const rpc_success_hdr &) {
     return fixed_size;
   }
   template<typename Archive> static void save(Archive &a,
 					      const rpc_success_hdr &t) {
+    auto xstr = xstring<8>(t.path_);
     archive(a, t.xid, "xid");
     archive(a, REPLY, "mtype");
     archive(a, MSG_ACCEPTED, "stat");
@@ -51,8 +53,8 @@ template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {
     archive(a, uint32_t(0), "body");
     archive(a, SUCCESS, "stat"); // 24 bytes
     archive(a, t.e_time_, "end_time"); // +8
-    archive(a, xstring<8>(t.path_), "path"); // +8
-    std::clog << "[save] end time: " << t.e_time_ << std::endl;
+    archive(a, xstr, "path"); // +8
+    std::clog << "[save] path: " << xstr.data() << std::endl;
   }
 };
 

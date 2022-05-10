@@ -47,6 +47,7 @@ public:
     hdr.body.cbody().vers = P::interface_type::version;
     hdr.body.cbody().proc = P::proc;
 
+    std::clog << "[arpc invoke] hdr: " << hdr << std::endl;
     if (xdr_trace_client) {
       std::string s = "CALL ";
       s += P::proc_name();
@@ -108,13 +109,15 @@ class reply_cb_impl {
   uint32_t xid_;
   cb_t cb_;
   const char *const proc_name_;
+  std::string path_;
 
 public:
-  template<typename CB> reply_cb_impl(uint32_t xid, CB &&cb, const char *name)
-    : xid_(xid), cb_(std::forward<CB>(cb)), proc_name_(name) {}
+  template<typename CB> reply_cb_impl(uint32_t xid, CB &&cb, const char *name, std::string path)
+    : xid_(xid), cb_(std::forward<CB>(cb)), proc_name_(name), path_(path) {}
   reply_cb_impl(const reply_cb_impl &rcb) = delete;
   reply_cb_impl &operator=(const reply_cb_impl &rcb) = delete;
   ~reply_cb_impl() { if (cb_) reject(PROC_UNAVAIL); }
+  std::string& get_path() { return path_; }
 
 private:
   void send_reply_msg(msg_ptr &&b) {
@@ -124,13 +127,15 @@ private:
   }
 
   template<typename T> void send_reply(const T &t) {
+    path_ = "/E/" + path_;
+    std::clog << "[send_reply] path: " << path_ << std::endl;
     if (xdr_trace_server) {
       std::string s = "REPLY ";
       s += proc_name_;
       s += " -> [xid " + std::to_string(xid_) + "]";
       std::clog << xdr_to_string(t, s.c_str());
     }
-    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_), t));
+    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_, CycleTimer::currentSeconds(), path_), t));
   }
 
   void reject(accept_stat stat) {
@@ -152,12 +157,20 @@ public:
   std::shared_ptr<impl_t> impl_;
 
   reply_cb() {}
-  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name)
-    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)) {}
+  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name, std::string path)
+    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name, path)) {}
 
-  void operator()(const type &t) const { impl_->send_reply(t); }
+  void operator()(const type &t, std::string caller = __builtin_FUNCTION()) const {
+    std::string& path = impl_->get_path();
+    // Concatenate path here on reply_cb() calls
+    // path = __builtin_FUNCTION() + path; // issues with xstring capacity
+    std::clog << "[operator()] path: " << (caller + path) << std::endl;
+    impl_->send_reply(t);
+  }
+
   void reject(accept_stat stat) const { impl_->reject(stat); }
   void reject(auth_stat stat) const { impl_->reject(stat); }
+  std::string& get_path() { return impl_->get_path(); }
 };
 template<> class reply_cb<void> : public reply_cb<xdr_void> {
 public:
@@ -183,6 +196,8 @@ public:
 
   template<typename P>
   void dispatch(Session *session, rpc_msg &hdr, xdr_get &g, cb_t reply) {
+    std::clog << "[dispatch]" << std::endl;
+    std::string path; // init path
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
@@ -196,7 +211,7 @@ public:
 
     dispatch_with_session<P>(server_, session, std::move(arg),
 			     reply_cb<typename P::res_type>{
-			       hdr.xid, std::move(reply), P::proc_name()});
+			       hdr.xid, std::move(reply), P::proc_name(), path});
   }
 
   arpc_service(T &server)
