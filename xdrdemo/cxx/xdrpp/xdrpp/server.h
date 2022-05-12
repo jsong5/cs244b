@@ -28,24 +28,31 @@ struct rpc_success_hdr {
   uint32_t xid;
   double_t e_time_;
   std::string_view path_;
+  uint32_t string_len;
   explicit constexpr rpc_success_hdr(uint32_t x)
-                    : xid(x), e_time_(0.0), path_("/S0/") {}
+                    : xid(x), e_time_(0.0), path_("/S0/"), string_len(4) {}
   explicit constexpr rpc_success_hdr(uint32_t x, double_t end_time, std::string_view path)
-                    : xid(x), e_time_(end_time), path_(path) {}
+                    : xid(x), e_time_(end_time), path_(path), string_len(4)  {}
+  explicit constexpr rpc_success_hdr(uint32_t x, double_t end_time, std::string_view path, uint32_t path_len)
+                    : xid(x), e_time_(end_time), path_(path), string_len(path_len)  {}
 };
+
 template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {
   static constexpr bool valid = true;
   static constexpr bool is_class = true;
   static constexpr bool is_struct = true;
-  static constexpr bool has_fixed_size = true;
-  static constexpr std::size_t fixed_size = 40; // Remove constexpr of fixed_size
+
+  //static constexpr bool has_fixed_size = false;
+  // static constexpr std::size_t fixed_size = 32 + 4; // Remove constexpr of fixed_size
   // fixed_size is dependent on path_ length. Always needs 4 more bytes for padding?
-  static constexpr std::size_t serial_size(const rpc_success_hdr &) {
-    return fixed_size;
+
+  static std::size_t serial_size(const rpc_success_hdr &t) {
+    int offset = 4 - t.string_len % 4;
+    return 36 + t.string_len + offset;
   }
   template<typename Archive> static void save(Archive &a,
 					      const rpc_success_hdr &t) {
-    auto xstr = xstring<8>(t.path_);
+    auto xstr = xstring<>(t.path_);
     archive(a, t.xid, "xid");
     archive(a, REPLY, "mtype");
     archive(a, MSG_ACCEPTED, "stat");

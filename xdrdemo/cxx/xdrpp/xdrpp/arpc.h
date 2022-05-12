@@ -83,6 +83,9 @@ public:
 	    }
 	  }
 
+    std::clog << "[arpc return] hdr: " << hdr << std::endl; 
+    std::clog << "[arpc return] path: " << hdr.body.rbody().areply().reply_data.success().path.data() << std::endl;
+
 	  cb(std::move(res));
 	}
 	catch (const xdr_runtime_error &e) {
@@ -127,7 +130,7 @@ private:
   }
 
   template<typename T> void send_reply(const T &t) {
-    path_ = "/E/" + path_;
+    path_ = "/E/S1112222a" + path_;
     std::clog << "[send_reply] path: " << path_ << std::endl;
     if (xdr_trace_server) {
       std::string s = "REPLY ";
@@ -135,7 +138,7 @@ private:
       s += " -> [xid " + std::to_string(xid_) + "]";
       std::clog << xdr_to_string(t, s.c_str());
     }
-    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_, CycleTimer::currentSeconds(), path_), t));
+    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_, CycleTimer::currentSeconds(), path_, path_.length()), t));
   }
 
   void reject(accept_stat stat) {

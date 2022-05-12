@@ -250,6 +250,7 @@ xdr_to_msg(const Args &...args)
   msg_ptr m (message_t::alloc(xdr_argpack_size(args...)));
   xdr_put p (m);
   xdr_argpack_archive(p, args...);
+  std::cerr << "p.p_ " << p.p_  << " vs " << "p.e_" << p.e_ << std::endl; 
   assert(p.p_ == p.e_);
   return m;
 }
