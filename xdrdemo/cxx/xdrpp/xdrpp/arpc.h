@@ -8,6 +8,7 @@
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
 #include <xdrpp/srpc.h>	     // XXX xdr_trace_client
+#include "../CycleTimer.h"
 
 namespace xdr {
 
@@ -102,6 +103,9 @@ template<typename T> using arpc_client =
 
 template<typename T> class reply_cb;
 
+using times = std::vector<double_t>;
+using trace = std::unordered_map<std::string, times>;
+
 namespace detail {
 class reply_cb_impl {
   template<typename T> friend class xdr::reply_cb;
@@ -110,6 +114,7 @@ class reply_cb_impl {
   cb_t cb_;
   const char *const proc_name_;
   std::string path_;
+  trace trace_{};
 
 public:
   template<typename CB> reply_cb_impl(uint32_t xid, CB &&cb, const char *name, std::string path)
@@ -118,6 +123,7 @@ public:
   reply_cb_impl &operator=(const reply_cb_impl &rcb) = delete;
   ~reply_cb_impl() { if (cb_) reject(PROC_UNAVAIL); }
   std::string& get_path() { return path_; }
+  trace& get_trace() { return trace_; }
 
 private:
   void send_reply_msg(msg_ptr &&b) {
@@ -127,6 +133,18 @@ private:
   }
 
   template<typename T> void send_reply(const T &t) {
+    trace& trace = get_trace();
+
+    std::clog << "[send_reply] TRACE" << std::endl;
+    for (auto& kv : trace) {
+      times timing = kv.second;
+      std::clog << "timing Info for " << kv.first << ": " << std::endl;
+      for (double_t it : timing) {
+        std::clog << it << ", ";
+      }
+      std::clog << std::endl;
+    }
+
     path_ = "/SEND_REPLY/" + path_;
     std::clog << "[send_reply] path: " << path_ << std::endl;
     if (xdr_trace_server) {
@@ -155,15 +173,21 @@ template<typename T> class reply_cb {
 public:
   using type = T;
   std::shared_ptr<impl_t> impl_;
+  double_t s_time_;
 
   reply_cb() {}
   template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name, std::string path)
-    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name, path)) {}
+    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name, path)),
+      s_time_(CycleTimer::currentSeconds()) {}
 
   void operator()(const type &t, std::string caller = __builtin_FUNCTION()) const {
+    double_t e_time = CycleTimer::currentSeconds();
     std::string& path = impl_->get_path();
     // Concatenate path here on reply_cb() calls
-    path = caller + "/" + path;
+    /* update path variable once all calls in one tier finish. Choose highest time for critical path. */
+    // path = caller + "/" + path;
+    xdr::trace& trace = impl_->get_trace();
+    trace[caller + "/" + path].push_back(e_time - s_time_); // insert the end time
     impl_->send_reply(t);
   }
 
@@ -197,7 +221,8 @@ public:
   template<typename P>
   void dispatch(Session *session, rpc_msg &hdr, xdr_get &g, cb_t reply) {
     std::clog << "[dispatch]" << std::endl;
-    std::string path = "DISPATCH/"; // init path
+    std::string path = "DISPATCH"; // init path.
+    // consider changing order, since this will act as root when request first made.
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
