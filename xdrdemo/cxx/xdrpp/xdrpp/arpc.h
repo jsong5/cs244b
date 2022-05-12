@@ -127,7 +127,7 @@ private:
   }
 
   template<typename T> void send_reply(const T &t) {
-    path_ = "/E/" + path_;
+    path_ = "/SEND_REPLY/" + path_;
     std::clog << "[send_reply] path: " << path_ << std::endl;
     if (xdr_trace_server) {
       std::string s = "REPLY ";
@@ -163,14 +163,14 @@ public:
   void operator()(const type &t, std::string caller = __builtin_FUNCTION()) const {
     std::string& path = impl_->get_path();
     // Concatenate path here on reply_cb() calls
-    // path = __builtin_FUNCTION() + path; // issues with xstring capacity
-    std::clog << "[operator()] path: " << (caller + path) << std::endl;
+    path = caller + "/" + path;
     impl_->send_reply(t);
   }
 
   void reject(accept_stat stat) const { impl_->reject(stat); }
   void reject(auth_stat stat) const { impl_->reject(stat); }
   std::string& get_path() { return impl_->get_path(); }
+  trace& get_trace() { return impl_->get_trace(); }
 };
 template<> class reply_cb<void> : public reply_cb<xdr_void> {
 public:
@@ -197,7 +197,7 @@ public:
   template<typename P>
   void dispatch(Session *session, rpc_msg &hdr, xdr_get &g, cb_t reply) {
     std::clog << "[dispatch]" << std::endl;
-    std::string path; // init path
+    std::string path = "DISPATCH/"; // init path
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
