@@ -19,9 +19,7 @@ KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
   std::string& path = cb.get_path();
-  std::clog << "[kv_put] cb path: " << cb.get_path() << std::endl;
-  path = "P" + path;
-  std::clog << "[kv_put] modified cb path: " << cb.get_path() << std::endl;
+  auto trace = cb.get_trace();
 
   double startTime = CycleTimer::currentSeconds();
   vals_[*k] = *v;
@@ -35,9 +33,6 @@ void
 KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use 
 {
   std::string& path = cb.get_path();
-  std::clog << "[kv_get] cb path: " << cb.get_path() << std::endl;
-  path = "G" + path;
-  std::clog << "[kv_get] modified cb path: " << cb.get_path() << std::endl;
 
   double startTime = CycleTimer::currentSeconds();
   auto iter = vals_.find(*k);
