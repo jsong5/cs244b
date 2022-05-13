@@ -1,6 +1,7 @@
 
 // TCP port to use
-const XDRDEMO_PORT = 30428;
+const XDRDEMO_PORT_ONE = 30428;
+const XDRDEMO_PORT_TWO = 30429;
 
 typedef string Key<64>;
 typedef string Value<512>;
@@ -24,4 +25,12 @@ program KVPROG {
     Status kv_put(Key, Value) = 1;  // Same as above, but needs a new identifier lol.
     GetRes kv_get(Key) = 2;         // For the union as seen above
   } = 1;                            // Assign version 1
+
+  version KVPROT2 {                 // This version just pushes the calls to another part.
+    void kv_null_2(void) = 3;         // Kind of a ping function. Almost like a C++ function prototype. Need to assign a unique number to the procedure. 
+    Status kv_put_2(Key, Value) = 4;  // Same as above, but needs a new identifier lol.
+    GetRes kv_get_2(Key) = 5;         // For the union as seen above
+  } = 2;                            // Assign version 2
+
 } = 0x2b0eefac;                     // Just some unique identifier.
+

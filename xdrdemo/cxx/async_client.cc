@@ -45,9 +45,9 @@ main(int argc, char **argv)
     std::cerr << "usage: " << argv[0] << " key [value]" << std::endl;
     exit(1);
   }
-
+  std::cerr << "connecting to PORT: " << XDRDEMO_PORT_ONE << std::endl;
   xdr::unique_sock fd =
-    xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT).c_str()); // basic socket for tcp
+    xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT_ONE).c_str()); // basic socket for tcp
   xdr::pollset ps;
   xdr::rpc_sock s(ps, fd.release());
   xdr::arpc_client<KVPROT1> client(s); // async rpc with application version feeing it the fd and ps we had. Inittializes client

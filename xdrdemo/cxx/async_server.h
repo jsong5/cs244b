@@ -11,14 +11,26 @@
 
 class KVPROT1_server {
   std::map<Key, Value> vals_;
-
 public:
   using rpc_interface_type = KVPROT1;
+  uint64_t id = 1;
 
   void kv_null(xdr::reply_cb<void> cb);
   void kv_put(std::unique_ptr<Key> arg1, std::unique_ptr<Value> arg2,
 	      xdr::reply_cb<Status> cb);
   void kv_get(std::unique_ptr<Key> arg, xdr::reply_cb<GetRes> cb);
+};
+
+class KVPROT2_server {
+  std::map<Key, Value> vals_;
+public:
+  using rpc_interface_type = KVPROT2;
+  uint64_t id = 2;
+
+  void kv_null_2(xdr::reply_cb<void> cb);
+  void kv_put_2(std::unique_ptr<Key> arg1, std::unique_ptr<Value> arg2,
+	      xdr::reply_cb<Status> cb);
+  void kv_get_2(std::unique_ptr<Key> arg, xdr::reply_cb<GetRes> cb);
 };
 
 #endif // !__XDR_ASYNC_SERVER_H_INCLUDED__

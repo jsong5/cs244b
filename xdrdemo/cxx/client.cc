@@ -4,7 +4,7 @@
 #include <xdrpp/srpc.h>
 #include "kvprot.hh"
 
-std::string portno = std::to_string(XDRDEMO_PORT);
+std::string portno = std::to_string(XDRDEMO_PORT_ONE);
 
 // Allows you to pretty-print XDR with <<
 using xdr::operator<<;

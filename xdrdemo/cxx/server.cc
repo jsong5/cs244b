@@ -5,7 +5,7 @@
 #include "CycleTimer.h"
 #include <xdrpp/srpc.h>
 
-std::string portno = std::to_string(XDRDEMO_PORT);
+std::string portno = std::to_string(XDRDEMO_PORT_ONE);
 
 void
 KVPROT1_server::kv_null()
