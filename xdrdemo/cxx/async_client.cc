@@ -51,7 +51,7 @@ main(int argc, char **argv)
   xdr::pollset ps;
   xdr::rpc_sock s(ps, fd.release());
   xdr::arpc_client<KVPROT1> client(s); // async rpc with application version feeing it the fd and ps we had. Inittializes client
-
+  
   if (argc == 2) // this is putting
     client.kv_get(Key(argv[1]), get_cb); // Client thing
 
