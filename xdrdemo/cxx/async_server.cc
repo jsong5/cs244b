@@ -45,9 +45,15 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 int
 main(int argc, char **argv)
 {
-  xdr::pollset ps;
+  if (argc < 2 || argc > 3) {
+        std::cerr << "usage: " << argv[0] << " [number]" << std::endl;
+        exit(1);
+  }
+  std:uint32_t num= atoi(argv[1]);
 
-  xdr::unique_sock sock = xdr::tcp_listen(std::to_string(XDRDEMO_PORT).c_str());
+  xdr::pollset ps;
+  std::cout << "async_server num :" <<num<< "Port : "<<XDRDEMO_PORT+num<< std::endl;
+  xdr::unique_sock sock = xdr::tcp_listen(std::to_string(XDRDEMO_PORT+num).c_str());
   xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
   KVPROT1_server s;

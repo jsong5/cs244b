@@ -153,7 +153,7 @@ tcp_connect(const char *host, const char *service, int family)
 unique_addrinfo
 bindable_address(const char *service, int family, int socktype)
 {
-  std::cout << "bindable_address " << std::endl;
+  std::cout << "bindable_address : " <<service<<"family : "<<service<<"socktype :" <<socktype<< std::endl;
   addrinfo hints, *res;
   std::memset(&hints, 0, sizeof(hints));
   hints.ai_socktype = socktype;
