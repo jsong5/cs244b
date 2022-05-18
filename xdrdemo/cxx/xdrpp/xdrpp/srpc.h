@@ -56,6 +56,9 @@ public:
       std::string s = "CALL ";
       s += P::proc_name();
       s += " -> [xid " + std::to_string(xid) + "]";
+      s += " -> [tracing ";
+      //s += std::to_string(hdr.tracing);
+      s += "]";
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
     write_message(s_, xdr_to_msg(hdr, a...));
@@ -76,6 +79,9 @@ public:
       std::string s = "REPLY ";
       s += P::proc_name();
       s += " <- [xid " + std::to_string(xid) + "]";
+      s += " -> [tracing ";
+      //s += std::to_string(hdr.tracing);
+      s += "]";
       std::clog << xdr_to_string(*r, s.c_str());
     }
     return moveret(r);

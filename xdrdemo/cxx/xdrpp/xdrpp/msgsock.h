@@ -101,6 +101,8 @@ public:
   using rcb_t = msg_sock::rcb_t;
   rcb_t servcb_;
 
+  rpc_sock() = default;
+  rpc_sock(const rpc_sock &) = delete;
   template<typename T>
   rpc_sock(pollset &ps, sock_t s, T &&t,
 	   size_t maxmsglen = msg_sock::default_maxmsglen)

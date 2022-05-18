@@ -42,6 +42,7 @@ template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {
   }
   template<typename Archive> static void save(Archive &a,
 					      const rpc_success_hdr &t) {
+    std::cout << "save::Archive: " << std::endl;
     archive(a, t.xid, "xid");
     archive(a, REPLY, "mtype");
     archive(a, MSG_ACCEPTED, "stat");

@@ -56,6 +56,7 @@ main(int argc, char **argv)
     client.kv_get(Key(argv[1]), get_cb); // Client thing
 
   else if (argc == 3) // this is seting
+    //std::cout << "RPC error: " << argv << std::endl;
     client.kv_put(Key(argv[1]), Value(argv[2]),
 		  [](xdr::call_result<Status> res) {
 		    if (!res) {
