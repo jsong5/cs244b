@@ -6,44 +6,39 @@
 
 uint32_t get_waiting = 0;
 uint32_t put_waiting = 0;
+std::vector<Value> get_values; // should be the same value across tiers, right?
 // Call back from one server to other
 void
-get_cb(xdr::call_result<GetRes> cb)
+get_cb(xdr::call_result<GetRes> res)
 {
-    //get_connectionport();
-    std::cout << "get_cb client: " << std::endl; 
-    get_waiting--;
-    /*
+  //get_connectionport();
   if (res) {
     if (res->stat() != SUCCESS) {
       std::cerr << "Error: " << res->stat();
     }
-    std::cout << res->value();
-  }
-  else {
+    std::cout << "get_cb client value: " << res->value() << std::endl;
+    get_values.push_back(res->value());
+  } else {
     std::cerr << "RPC error: " << res.message() << std::endl;
   }
-  */
- 
+  get_waiting--;
 }
 
 void
-put_cb(xdr::call_result<Status> cb)
+put_cb(xdr::call_result<Status> res)
 {
     std::cout << "put_cb client: " << std::endl; 
     put_waiting--;
-    /*
-  if (res) {
-    if (res->stat() != SUCCESS) {
-      std::cerr << "Error: " << res->stat();
+
+    if (!res) {
+      std::cerr << "RPC error: " << res.message() << std::endl;
+      exit(1);
+    } else if (*res != SUCCESS) {
+      std::cerr << "Error: " << *res << std::endl;
+      exit(1);
     }
-    std::cout << res->value();
-  }
-  else {
-    std::cerr << "RPC error: " << res.message() << std::endl;
-  }
-  */
 }
+
 //KVTIERPROT_server
 //KVPROT1
 /*
@@ -162,10 +157,16 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
     //Take all the replies provided by the next-tier servers and
     //Calculate the critical path and send the response value back to the prev-tier servers
     
-    //Just a simple static value sending back.
-    // GetRes res(SUCCESS);	// (Redundant, 0 is default)
-    // res.value() = "99999";
-    // cb(res);
+    /* All tiers should return the same value, so get_values as a vector may be
+    redundant. Added in case we want to process all the values to check for errs. */
+    if (get_values.empty()) {
+      GetRes res(NOTFOUND);
+      cb(res);
+    } else {
+      GetRes res(SUCCESS);	// (Redundant, 0 is default)
+      res.value() = get_values[0];
+      cb(res);
+    }
 }
 
 void
