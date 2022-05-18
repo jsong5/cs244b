@@ -70,7 +70,6 @@ public:
         call_result<typename P::res_type> res(hdr);
         if (res)
         {
-          std::cout << "res :  " << *res<<std::endl;
           archive(g, *res);
         }
         g.done();
@@ -88,7 +87,6 @@ public:
             std::clog << s;
           }
         }
-        std::cout << "invoke :  " << *res<<std::endl;
         cb(std::move(res));
       }
       catch (const xdr_runtime_error &e) {
@@ -148,7 +146,6 @@ public:
         call_result<typename P::res_type> res(hdr);
         if (res)
         {
-          std::cout << "res :  " << *res<<std::endl;
           archive(g, *res);
         }
         g.done();
@@ -166,7 +163,6 @@ public:
             std::clog << s;
           }
         }
-        std::cout << "invoke :  " << *res<<std::endl;
         cb(std::move(res));
       }
       catch (const xdr_runtime_error &e) {
@@ -211,7 +207,6 @@ public:
 private:
   void send_reply_msg(msg_ptr &&b) {
     assert(cb_);		// If this fails you replied twice
-    std::cout << "send_reply_msg : b size"<<b->size() << std::endl;  
     cb_(std::move(b));
     cb_ = nullptr;
   }

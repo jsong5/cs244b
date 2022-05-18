@@ -15,7 +15,6 @@ std::vector<rpcb> registered_services;
 void
 run_cleanup()
 {
-  std::cout << "run_cleanup :" << std::endl;
   try {
     auto fd = tcp_connect(nullptr, "sunrpc");
     srpc_client<xdr::RPCBVERS4> c{fd.get()};
@@ -28,7 +27,6 @@ run_cleanup()
 void
 set_cleanup()
 {
-  std::cout << "set_cleanup :" << std::endl;
   static struct once {
     once() { atexit(run_cleanup); }
   } o;
@@ -40,7 +38,6 @@ std::unique_ptr<sockaddr>
 lookup_rpc(const char *host, std::uint32_t prog, std::uint32_t vers,
 	   socklen_t *, int family, int sotype)
 {
-  std::cout << "lookup_rpc :" << std::endl;
   unique_addrinfo ail = get_addrinfo(host, SOCK_STREAM, "sunrpc", family);
 
   for (const addrinfo *ai = ail.get(); ai; ai = ai->ai_next) {
@@ -85,7 +82,6 @@ unique_sock
 tcp_connect_rpc(const char *host, std::uint32_t prog, std::uint32_t vers,
 		int family)
 {
-  std::cout << "tcp_connect_rpc :" << std::endl;
   unique_addrinfo ail = get_addrinfo(host, SOCK_STREAM, "sunrpc", family);
 
   for (const addrinfo *ai = ail.get(); ai; ai = ai->ai_next) {
@@ -125,7 +121,6 @@ tcp_connect_rpc(const char *host, std::uint32_t prog, std::uint32_t vers,
 int
 parse_uaddr_port(const string &uaddr)
 {
-  std::cout << "parse_uaddr_port :" << std::endl;
   std::size_t low = uaddr.rfind('.');
   if (low == string::npos || low == 0)
     return -1;
@@ -151,7 +146,6 @@ parse_uaddr_port(const string &uaddr)
 string
 make_uaddr(const sockaddr *sa, socklen_t salen)
 {
-  std::cout << "make_uaddr :" << std::endl;
   string host, portstr;
   get_numinfo(sa, salen, &host, &portstr);
   unsigned port = std::stoul(portstr);
@@ -165,7 +159,6 @@ make_uaddr(const sockaddr *sa, socklen_t salen)
 string
 make_uaddr(sock_t s)
 {
-  std::cout << "make_uaddr s:" << std::endl;
   union {
     struct sockaddr sa;
     struct sockaddr_storage ss;
@@ -181,7 +174,6 @@ void
 rpcbind_register(const sockaddr *sa, socklen_t salen, int so_type,
 		 std::uint32_t prog, std::uint32_t vers)
 {
-  std::cout << "rpcbind_register:" << std::endl;
   set_cleanup();
 
   auto fd = tcp_connect(nullptr, "sunrpc", sa->sa_family);
@@ -206,7 +198,6 @@ rpcbind_register(const sockaddr *sa, socklen_t salen, int so_type,
 void
 rpcbind_register(sock_t s, std::uint32_t prog, std::uint32_t vers)
 {
-  std::cout << "rpcbind_register: prog" << std::endl;
   union {
     struct sockaddr sa;
     struct sockaddr_storage ss;
