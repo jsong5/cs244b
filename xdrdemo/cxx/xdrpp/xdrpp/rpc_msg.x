@@ -15,6 +15,10 @@ struct opaque_auth {
   opaque body<400>;
 };
 
+struct opaque_trace {
+  opaque body<>;
+};
+
 enum msg_type {
   CALL  = 0,
   REPLY = 1
@@ -121,7 +125,7 @@ union rejected_reply switch (reject_stat stat) {
      unsigned int high;
    } mismatch_info;
  case AUTH_ERROR:
-   auth_stat rj_why;
+  auth_stat rj_why;
 };
 
 /* Body of a reply to an RPC call: */

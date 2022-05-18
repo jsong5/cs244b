@@ -5,9 +5,9 @@ CXXFLAGS = -ggdb -std=c++14
 
 XDRC = xdrpp/xdrc/xdrc
 BUILT_SOURCES = kvprot.hh
-LDADD = -Lxdrpp/xdrpp -lxdrpp
+LDADD = -Lxdrpp/xdrpp -lxdrpp -pthread
 
-TARGETS = client server async_client async_server
+TARGETS = client server async_client async_server tiering_server
 all: $(TARGETS)
 
 $(XDRC):
@@ -43,6 +43,12 @@ async_client.o: async_client.cc kvprot.hh
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $<
 
 async_client: async_client.o
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDADD)
+
+tiering_server.o: tiering_server.cc tiering_server.h kvprot.hh
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) -c $<
+
+tiering_server: tiering_server.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDADD)
 
 .PHONY: clean

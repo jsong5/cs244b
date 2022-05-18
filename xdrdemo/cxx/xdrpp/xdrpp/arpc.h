@@ -11,7 +11,7 @@
 #include "../CycleTimer.h"
 
 namespace xdr {
-
+std::string DEFAULT_PORT ("DEFAULT_PORT");
 //! A \c unique_ptr to a call result, or NULL if the call failed (in
 //! which case \c message returns an error message).
 template<typename T> struct call_result : std::unique_ptr<T> {
@@ -34,6 +34,7 @@ template<> struct call_result<void> {
 
 class asynchronous_client_base {
   rpc_sock &s_;
+  //std::string &connect_port_;
 
 public:
   asynchronous_client_base(rpc_sock &s) : s_(s) {}
@@ -42,7 +43,7 @@ public:
   template<typename P, typename...A>
   void invoke(const A &...a,
 	      std::function<void(call_result<typename P::res_type>)> cb) {
-    rpc_msg hdr { s_.get_xid(), CALL };
+    rpc_msg hdr { s_.get_xid(),CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
     hdr.body.cbody().vers = P::interface_type::version;
@@ -54,42 +55,46 @@ public:
       s += P::proc_name();
       s += " -> [xid ";
       s += std::to_string(hdr.xid);
-      s += "]";
+      s += "]";      
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
 
     s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
-	if (!m)
-	  return cb(rpc_call_stat::NETWORK_ERROR);
-	try {
-	  xdr_get g(m);
-	  rpc_msg hdr;
-	  archive(g, hdr);
-	  call_result<typename P::res_type> res(hdr);
-	  if (res)
-	    archive(g, *res);
-	  g.done();
+      if (!m)
+          return cb(rpc_call_stat::NETWORK_ERROR);
+        
+      try {
+        xdr_get g(m);
+        rpc_msg hdr;
+        archive(g, hdr);
+        call_result<typename P::res_type> res(hdr);
+        if (res)
+        {
+          std::cout << "res :  " << *res<<std::endl;
+          archive(g, *res);
+        }
+        g.done();
 
-	  if (xdr_trace_client) {
-	    std::string s = "REPLY ";
-	    s += P::proc_name();
-	    s += " <- [xid " + std::to_string(hdr.xid) + "]";
-	    if (res)
-	      std::clog << xdr_to_string(*res, s.c_str());
-	    else {
-	      s += ": ";
-	      s += res.message();
-	      s += "\n";
-	      std::clog << s;
-	    }
-	  }
-
-	  cb(std::move(res));
-	}
-	catch (const xdr_runtime_error &e) {
-	  cb(rpc_call_stat::GARBAGE_RES);
-	}
-      });
+        if (xdr_trace_client) {
+          std::string s = "REPLY ";
+          s += P::proc_name();
+          s += " <- [xid " + std::to_string(hdr.xid) + "]";
+          if (res)
+            std::clog << xdr_to_string(*res, s.c_str());
+          else {
+            s += ": ";
+            s += res.message();
+            s += "\n";
+            std::clog << s;
+          }
+        }
+        std::cout << "invoke :  " << *res<<std::endl;
+        cb(std::move(res));
+      }
+      catch (const xdr_runtime_error &e) {
+        cb(rpc_call_stat::GARBAGE_RES);
+      }
+    });
   }
 
   asynchronous_client_base *operator->() { return this; }
@@ -98,6 +103,83 @@ public:
 template<typename T> using arpc_client =
   typename T::template _xdr_client<asynchronous_client_base>;
 
+class asynchronous_client_base1 {
+  rpc_sock &s_;
+  xdr::xstring<64U> connect_port_;
+
+public:
+  asynchronous_client_base1(rpc_sock &s, xdr::xstring<64U> connect_port) : s_(s),connect_port_(connect_port) {}
+  asynchronous_client_base1(rpc_sock &s) : s_(s),connect_port_(DEFAULT_PORT) {}
+  asynchronous_client_base1(asynchronous_client_base1 &c) : s_(c.s_),connect_port_(c.connect_port_) {}
+  
+  xdr::xstring<64U> get_connectionport()
+  {
+    return connect_port_;
+  }
+
+  template<typename P, typename...A>
+  void invoke(const A &...a,
+	      std::function<void(call_result<typename P::res_type>)> cb) {
+    rpc_msg hdr { s_.get_xid(), CALL };
+    hdr.body.cbody().rpcvers = 2;
+    hdr.body.cbody().prog = P::interface_type::program;
+    hdr.body.cbody().vers = P::interface_type::version;
+    hdr.body.cbody().proc = P::proc;
+
+    if (xdr_trace_client) {
+      std::string s = "CALL ";
+      s += P::proc_name();
+      s += " -> [xid ";
+      s += std::to_string(hdr.xid);
+      s += "]";
+      std::clog << xdr_to_string(std::tie(a...), s.c_str());
+    }
+
+    s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
+      std::string scc = "XXXXX";
+      if (!m)
+      {
+        return cb(rpc_call_stat::NETWORK_ERROR);
+      }
+      try {
+        xdr_get g(m);
+        rpc_msg hdr;
+        archive(g, hdr);
+        call_result<typename P::res_type> res(hdr);
+        if (res)
+        {
+          std::cout << "res :  " << *res<<std::endl;
+          archive(g, *res);
+        }
+        g.done();
+
+        if (xdr_trace_client) {
+          std::string s = "REPLY ";
+          s += P::proc_name();
+          s += " <- [xid " + std::to_string(hdr.xid) + "]";
+          if (res)
+            std::clog << xdr_to_string(*res, s.c_str());
+          else {
+            s += ": ";
+            s += res.message();
+            s += "\n";
+            std::clog << s;
+          }
+        }
+        std::cout << "invoke :  " << *res<<std::endl;
+        cb(std::move(res));
+      }
+      catch (const xdr_runtime_error &e) {
+        cb(rpc_call_stat::GARBAGE_RES);
+      }
+    });
+  }
+
+  asynchronous_client_base1 *operator->() { return this; }
+};
+
+template<typename T> using arpc_client1 =
+  typename T::template _xdr_client<asynchronous_client_base1>;
 
 // And now for the server
 
@@ -111,6 +193,7 @@ class reply_cb_impl {
   template<typename T> friend class xdr::reply_cb;
   using cb_t = service_base::cb_t;
   uint32_t xid_;
+  //xdr::xstring<64U> connect_port_;
   cb_t cb_;
   const char *const proc_name_;
   std::string path_;
@@ -128,6 +211,7 @@ public:
 private:
   void send_reply_msg(msg_ptr &&b) {
     assert(cb_);		// If this fails you replied twice
+    std::cout << "send_reply_msg : b size"<<b->size() << std::endl;  
     cb_(std::move(b));
     cb_ = nullptr;
   }
@@ -226,7 +310,7 @@ public:
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
-
+    
     if (xdr_trace_server) {
       std::string s = "CALL ";
       s += P::proc_name();

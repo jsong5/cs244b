@@ -4,11 +4,12 @@
 
 namespace xdr {
 
-bool xdr_trace_server = std::getenv("XDR_TRACE_SERVER");
+bool xdr_trace_server = true;//std::getenv("XDR_TRACE_SERVER");
 
 msg_ptr
 rpc_accepted_error_msg(uint32_t xid, accept_stat stat)
 {
+  std::cout << "rpc_accepted_error_msg: " << std::endl;
   assert(stat != SUCCESS && stat != PROG_MISMATCH);
   msg_ptr buf(message_t::alloc(24));
   xdr_put p(buf);
@@ -25,6 +26,7 @@ rpc_accepted_error_msg(uint32_t xid, accept_stat stat)
 msg_ptr
 rpc_prog_mismatch_msg(uint32_t xid, uint32_t low, uint32_t high)
 {
+  std::cout << "rpc_prog_mismatch_msg: " << std::endl;
   msg_ptr buf(message_t::alloc(32));
   xdr_put p(buf);
   p(xid);
@@ -42,6 +44,7 @@ rpc_prog_mismatch_msg(uint32_t xid, uint32_t low, uint32_t high)
 msg_ptr
 rpc_auth_error_msg(uint32_t xid, auth_stat stat)
 {
+  std::cout << "rpc_auth_error_msg: " << std::endl;
   msg_ptr buf(message_t::alloc(20));
   xdr_put p(buf);
   p(xid);
@@ -56,6 +59,7 @@ rpc_auth_error_msg(uint32_t xid, auth_stat stat)
 msg_ptr
 rpc_rpc_mismatch_msg(uint32_t xid)
 {
+  std::cout << "rpc_rpc_mismatch_msg: " << std::endl;
   msg_ptr buf(message_t::alloc(24));
   xdr_put p(buf);
   p(xid);
@@ -72,12 +76,15 @@ rpc_rpc_mismatch_msg(uint32_t xid)
 void
 rpc_server_base::register_service_base(service_base *s)
 {
+  std::cout << "rpc_server_base::register_service_base: " << std::endl;
   servers_[s->prog_][s->vers_].reset(s);
 }
 
 void
 rpc_server_base::dispatch(void *session, msg_ptr m, service_base::cb_t reply)
 {
+  std::cout << "rpc_server_base::dispatch: " << std::endl;
+  
   xdr_get g(m);
   rpc_msg hdr;
 
@@ -122,6 +129,7 @@ rpc_tcp_listener_common::rpc_tcp_listener_common(pollset &ps, unique_sock &&s,
   : listen_sock_(s ? std::move(s) : tcp_listen()), use_rpcbind_(reg),
     ps_(ps)
 {
+  std::cout << "rpc_tcp_listener_common::rpc_tcp_listener_common " << std::endl;
   set_close_on_exec(listen_sock_.get());
   ps_.fd_cb(listen_sock_.get(), pollset::Read,
 	    std::bind(&rpc_tcp_listener_common::accept_cb, this));
@@ -129,6 +137,8 @@ rpc_tcp_listener_common::rpc_tcp_listener_common(pollset &ps, unique_sock &&s,
 
 rpc_tcp_listener_common::~rpc_tcp_listener_common()
 {
+  std::cout << "rpc_tcp_listener_common::~rpc_tcp_listener_common " << std::endl;
+  
   ps_.fd_cb(listen_sock_.get(), pollset::Read);
   // XXX should clean up if use_rpcbind_.
 }
@@ -136,6 +146,7 @@ rpc_tcp_listener_common::~rpc_tcp_listener_common()
 void
 rpc_tcp_listener_common::accept_cb()
 {
+  std::cout << "rpc_tcp_listener_common::accept_cb " << std::endl;
   sock_t s = accept(listen_sock_.get(), nullptr, 0);
   if (s == invalid_sock) {
     std::cerr << "rpc_tcp_listener_common: accept: " << sock_errmsg()
@@ -151,6 +162,7 @@ rpc_tcp_listener_common::accept_cb()
 void
 rpc_tcp_listener_common::receive_cb(rpc_sock *ms, void *session, msg_ptr mp)
 {
+  std::cout << "rpc_tcp_listener_common::receive_cb " << std::endl;
   if (!mp) {
     session_free(session);
     delete ms;
