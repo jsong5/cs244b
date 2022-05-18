@@ -223,11 +223,11 @@ rpc_sock::recv_msg(msg_ptr b)
   std::cout << "msg_sock::recv_msg() :b->size() :" << b->raw_data() <<std::endl;
   std::cout << "msg_sock::recv_msg() :tracing :" << b->word(1)<<std::endl;
   
-  if (b->word(3) == swap32le(CALL))
+  if (b->word(1) == swap32le(CALL))
   {
     std::cout << "msg_sock::recv_msg() : CALL handling"<<std::endl;
     recv_call(std::move(b));
-  }else if (b->word(3) == swap32le(REPLY)) {
+  }else if (b->word(1) == swap32le(REPLY)) {
     std::cout << "msg_sock::recv_msg() :REPLY handling"<<std::endl;
     auto calli = calls_.find(b->word(0));
     if (calli == calls_.end()) {
