@@ -43,7 +43,7 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
     cb(res);
   }
   else {
-      std::cout << "Sever Side GET Key :" << *k << "Value : "<<iter->second<< std::endl;
+    std::cout << "Server Side GET Key :" << *k << "Value : "<<iter->second<< std::endl;
     GetRes res(SUCCESS);	// (Redundant, 0 is default)
     res.value() = iter->second;
     cb(res);
@@ -62,7 +62,7 @@ main(int argc, char **argv)
   std:uint32_t num= atoi(argv[1]);
 
   xdr::pollset ps;
-  std::cout << "async_server num :" <<num<< "Port : "<<XDRDEMO_PORT+num<< std::endl;
+  std::cout << "async_server num:" << num<< ", Port : "<< XDRDEMO_PORT+num << std::endl;
   xdr::unique_sock sock = xdr::tcp_listen(std::to_string(XDRDEMO_PORT+num).c_str());
   xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
