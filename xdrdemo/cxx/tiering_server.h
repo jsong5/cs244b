@@ -17,7 +17,7 @@ typedef struct _Client_Storage {
     std::thread *thrd;
 } Client_Storage;
 
-class KVPROT1_server {
+class KVPROT1_master {
   std::map<Key, Value> vals_;
   
 public:

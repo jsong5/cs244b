@@ -42,7 +42,7 @@ public:
 
   template<typename P, typename...A>
   void invoke(const A &...a,
-	      std::function<void(call_result<typename P::res_type>)> cb) {
+	      std::function<void(call_result<typename P::res_type>, std::string)> cb) {
     rpc_msg hdr { s_.get_xid(),CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
@@ -61,7 +61,7 @@ public:
 
     s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
       if (!m)
-          return cb(rpc_call_stat::NETWORK_ERROR);
+          return cb(rpc_call_stat::NETWORK_ERROR, "");
         
       try {
         xdr_get g(m);
@@ -87,10 +87,10 @@ public:
             std::clog << s;
           }
         }
-        cb(std::move(res));
+        cb(std::move(res), "");
       }
       catch (const xdr_runtime_error &e) {
-        cb(rpc_call_stat::GARBAGE_RES);
+        cb(rpc_call_stat::GARBAGE_RES, "");
       }
     });
   }
@@ -117,7 +117,7 @@ public:
 
   template<typename P, typename...A>
   void invoke(const A &...a,
-	      std::function<void(call_result<typename P::res_type>)> cb) {
+	      std::function<void(call_result<typename P::res_type>, std::string)> cb) {
     rpc_msg hdr { s_.get_xid(), CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
@@ -137,13 +137,15 @@ public:
       std::string scc = "XXXXX";
       if (!m)
       {
-        return cb(rpc_call_stat::NETWORK_ERROR);
+        return cb(rpc_call_stat::NETWORK_ERROR, "");
       }
       try {
         xdr_get g(m);
         rpc_msg hdr;
         archive(g, hdr);
         call_result<typename P::res_type> res(hdr);
+        auto path = hdr.body.rbody().areply().reply_data.success().path;
+
         if (res)
         {
           archive(g, *res);
@@ -163,10 +165,11 @@ public:
             std::clog << s;
           }
         }
-        cb(std::move(res));
+
+        cb(std::move(res), path);
       }
       catch (const xdr_runtime_error &e) {
-        cb(rpc_call_stat::GARBAGE_RES);
+        cb(rpc_call_stat::GARBAGE_RES, "");
       }
     });
   }
@@ -196,8 +199,8 @@ class reply_cb_impl {
   trace trace_{};
 
 public:
-  template<typename CB> reply_cb_impl(uint32_t xid, CB &&cb, const char *name, std::string path)
-    : xid_(xid), cb_(std::forward<CB>(cb)), proc_name_(name), path_(path) {}
+  template<typename CB> reply_cb_impl(uint32_t xid, CB &&cb, const char *name)
+    : xid_(xid), cb_(std::forward<CB>(cb)), proc_name_(name), path_("") {}
   reply_cb_impl(const reply_cb_impl &rcb) = delete;
   reply_cb_impl &operator=(const reply_cb_impl &rcb) = delete;
   ~reply_cb_impl() { if (cb_) reject(PROC_UNAVAIL); }
@@ -224,7 +227,6 @@ private:
       std::clog << std::endl;
     }
 
-    path_ = "/SEND_REPLY/" + path_;
     std::clog << "[send_reply] path: " << path_ << std::endl;
     if (xdr_trace_server) {
       std::string s = "REPLY ";
@@ -255,18 +257,17 @@ public:
   double_t s_time_;
 
   reply_cb() {}
-  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name, std::string path)
-    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name, path)),
+  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name)
+    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
       s_time_(CycleTimer::currentSeconds()) {}
 
-  void operator()(const type &t, std::string caller = __builtin_FUNCTION()) const {
+  void operator()(const type &t, std::string server = __builtin_FUNCTION()) const {
+    std::cout << "[reply_cb operator()]" << std::endl;
     double_t e_time = CycleTimer::currentSeconds();
     std::string& path = impl_->get_path();
-    // Concatenate path here on reply_cb() calls
-    /* update path variable once all calls in one tier finish. Choose highest time for critical path. */
-    // path = caller + "/" + path;
+    path = server + "/" + path;
     xdr::trace& trace = impl_->get_trace();
-    trace[caller + "/" + path].push_back(e_time - s_time_); // insert the end time
+    trace[path].push_back(e_time - s_time_); // insert the end time
     impl_->send_reply(t);
   }
 
@@ -300,8 +301,6 @@ public:
   template<typename P>
   void dispatch(Session *session, rpc_msg &hdr, xdr_get &g, cb_t reply) {
     std::clog << "[dispatch]" << std::endl;
-    std::string path = "DISPATCH"; // init path.
-    // consider changing order, since this will act as root when request first made.
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
@@ -315,7 +314,7 @@ public:
 
     dispatch_with_session<P>(server_, session, std::move(arg),
 			     reply_cb<typename P::res_type>{
-			       hdr.xid, std::move(reply), P::proc_name(), path});
+			       hdr.xid, std::move(reply), P::proc_name()});
   }
 
   arpc_service(T &server)

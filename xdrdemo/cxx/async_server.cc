@@ -23,11 +23,12 @@ KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 
   double startTime = CycleTimer::currentSeconds();
   vals_[*k] = *v;
-  sleep(1);
+  auto sleep_time = (id_ == "30429") ? 3 : 1;
+  sleep(sleep_time);
   double endTime = CycleTimer::currentSeconds();
   std::clog << "[kv_put] Time: " << (endTime - startTime) << std::endl;
   std::cout << "Server Side SET Key :" << *k << "Value : "<<vals_[*k]<< std::endl;
-  cb(SUCCESS); // return value. Stands for callback I think
+  cb(SUCCESS, id_); // return value. Stands for callback I think
 }
 
 void
@@ -40,13 +41,13 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 
   if (iter == vals_.end()) {
     GetRes res(NOTFOUND); // initialize the proper type for the result. Also initializes the other type in the union
-    cb(res);
+    cb(res, id_);
   }
   else {
     std::cout << "Server Side GET Key :" << *k << "Value : "<<iter->second<< std::endl;
     GetRes res(SUCCESS);	// (Redundant, 0 is default)
     res.value() = iter->second;
-    cb(res);
+    cb(res, id_);
   }
   double endTime = CycleTimer::currentSeconds();
   std::clog << "[kv_get] Time: " << (endTime - startTime) << std::endl;
@@ -61,12 +62,13 @@ main(int argc, char **argv)
   }
   std:uint32_t num= atoi(argv[1]);
 
+  auto portno = XDRDEMO_PORT + num;
   xdr::pollset ps;
-  std::cout << "async_server num:" << num<< ", Port : "<< XDRDEMO_PORT+num << std::endl;
-  xdr::unique_sock sock = xdr::tcp_listen(std::to_string(XDRDEMO_PORT+num).c_str());
+  std::cout << "async_server num:" << num << ", Port : "<< portno << std::endl;
+  xdr::unique_sock sock = xdr::tcp_listen(std::to_string(portno).c_str());
   xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
-  KVPROT1_server s;
+  KVPROT1_server s(portno);
   listen.register_service(s);
 
   ps.run();
