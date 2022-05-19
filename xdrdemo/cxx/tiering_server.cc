@@ -7,9 +7,11 @@
 uint32_t get_waiting = 0;
 uint32_t put_waiting = 0;
 std::vector<Value> get_values; // should be the same value across tiers, right?
+std::vector<xdr::xstring<>> paths;
+
 // Call back from one server to other
 void
-get_cb(xdr::call_result<GetRes> res)
+get_cb(xdr::call_result<GetRes> res, std::string p)
 {
   //get_connectionport();
   if (res) {
@@ -18,6 +20,9 @@ get_cb(xdr::call_result<GetRes> res)
     }
     std::cout << "get_cb client value: " << res->value() << std::endl;
     get_values.push_back(res->value());
+    if (!p.empty()) {
+      paths.push_back(p);
+    }
   } else {
     std::cerr << "RPC error: " << res.message() << std::endl;
   }
@@ -25,9 +30,12 @@ get_cb(xdr::call_result<GetRes> res)
 }
 
 void
-put_cb(xdr::call_result<Status> res)
+put_cb(xdr::call_result<Status> res, std::string p)
 {
-    std::cout << "put_cb client: " << std::endl; 
+    std::cout << "put_cb client path: " << p << std::endl;
+    if (!p.empty()) {
+      paths.push_back(p);
+    }
     put_waiting--;
 
     if (!res) {
@@ -95,13 +103,13 @@ KVPROT1_server::kvtier_get(std::unique_ptr<Key> k,xdr::reply_cb<GetRes> cb)// vo
 }
 */
 void
-KVPROT1_server::kv_null(xdr::reply_cb<void> cb)
+KVPROT1_master::kv_null(xdr::reply_cb<void> cb)
 {
   cb(); // return void 
 }
 
 void
-KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
+KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
     std::map<TierServerIdentification, Client_Storage*>::iterator it = NextTierConnections.begin();
@@ -110,17 +118,28 @@ KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
     {
         Client_Storage* cs = it->second; //((xdr::arpc_client<KVTIERPROT>)(*(cs->client)))
         xdr::arpc_client1<KVPROT1> *client = cs->client;
-        std::cout << "kvtier_get client: " << cs->servertoconnectidentification << std::endl; 
-        std::cout << "kvtier_get key: " << *k << std::endl; 
+        std::cout << "kvtier_put client: " << cs->servertoconnectidentification << std::endl;
+        std::cout << "kvtier_put key: " << *k << std::endl;
         client->kv_put(Key(*k),Value(*v),put_cb);
 
         it++;
     }
     std::cout << "put_waiting before: " << put_waiting << std::endl;
     while(put_waiting > 0){}
-    std::cout << "put_waiting after: " << put_waiting << std::endl; 
+    std::cout << "put_waiting after: " << put_waiting << std::endl;
     //kvtier_get(k,v,cb);
     
+    std::cout << "paths: ";
+    for (auto p : paths) {
+      std::cout << p << ", ";
+    }
+    std::cout << std::endl;
+
+    auto critical_path = paths.empty() ? "/" : *paths.begin();
+    std::cout << "[crit path] " << critical_path << std::endl;
+
+    std::cout << "[cb get path] " << cb.get_path() << std::endl;
+    cb.get_path() = critical_path;
     //Placeholder to perform the critical path handling
     
     //Need the handling for the get here to perfrom the handling 
@@ -128,11 +147,13 @@ KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
     //Calculate the critical path and send the response value back to the prev-tier servers
     
     //Just a simple static value sending back.
-  cb(SUCCESS); // return value. Stands for callback I think
+
+  cb(SUCCESS, "Master"); // return value. Stands for callback I think
+  paths = {};
 }
 
 void
-KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use 
+KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 {
   
     std::map<TierServerIdentification, Client_Storage*>::iterator it = NextTierConnections.begin();
@@ -141,8 +162,8 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
     {
         Client_Storage* cs = it->second; //((xdr::arpc_client<KVTIERPROT>)(*(cs->client)))
         xdr::arpc_client1<KVPROT1> *client = cs->client;
-        std::cout << "kvtier_get client: " << cs->servertoconnectidentification << std::endl; 
-        std::cout << "kvtier_get key :" << *k << std::endl; 
+        std::cout << "kvtier_get client: " << cs->servertoconnectidentification << std::endl;
+        std::cout << "kvtier_get key :" << *k << std::endl;
         client->kv_get(Key(*k),get_cb);
         it++;
     }
@@ -167,10 +188,11 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
       res.value() = get_values[0];
       cb(res);
     }
+    paths = {};
 }
 
 void
-KVPROT1_server::kvtier_setconnections(Client_Storage* cs)
+KVPROT1_master::kvtier_setconnections(Client_Storage* cs)
 {
   NextTierConnections[cs->servertoconnectidentification] = cs;
 }
@@ -201,7 +223,7 @@ main(int argc, char **argv)
     xdr::unique_sock sock = xdr::tcp_listen((std::to_string(XDRDEMO_PORT+tiernum_n+servernum)).c_str());
     xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
-    KVPROT1_server s;
+    KVPROT1_master s;
     listen.register_service(s);
 
     // Establish the client-sockets to accept the requests from n+1 tier servers

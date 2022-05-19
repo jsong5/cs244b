@@ -97,7 +97,7 @@ struct accepted_reply {
   case SUCCESS:
     struct {
       double end_time;
-      opaque path<>;
+      string path<>;
       opaque results[0];
     } success;
     /*

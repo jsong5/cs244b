@@ -10,10 +10,15 @@
 #include "kvprot.hh"
 
 class KVPROT1_server {
+  TierServerIdentification id_;
   std::map<Key, Value> vals_;
 
 public:
   using rpc_interface_type = KVPROT1;
+
+  KVPROT1_server() : id_("DEFAULT_PORT") {}
+
+  KVPROT1_server(uint32_t portno) : id_(std::to_string(portno).c_str()) {}
 
   void kv_null(xdr::reply_cb<void> cb);
   void kv_put(std::unique_ptr<Key> arg1, std::unique_ptr<Value> arg2,
