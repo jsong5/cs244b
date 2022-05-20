@@ -184,7 +184,7 @@ template<typename T> using arpc_client1 =
 
 template<typename T> class reply_cb;
 
-using times = std::vector<double_t>;
+using times = std::vector<double>;
 using trace = std::unordered_map<std::string, times>;
 
 namespace detail {
@@ -221,7 +221,7 @@ private:
     for (auto& kv : trace) {
       times timing = kv.second;
       std::clog << "timing Info for " << kv.first << ": " << std::endl;
-      for (double_t it : timing) {
+      for (double it : timing) {
         std::clog << it << ", ";
       }
       std::clog << std::endl;
@@ -254,7 +254,7 @@ template<typename T> class reply_cb {
 public:
   using type = T;
   std::shared_ptr<impl_t> impl_;
-  double_t s_time_;
+  double s_time_;
 
   reply_cb() {}
   template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name)
@@ -263,7 +263,7 @@ public:
 
   void operator()(const type &t, std::string server = __builtin_FUNCTION()) const {
     std::cout << "[reply_cb operator()]" << std::endl;
-    double_t e_time = CycleTimer::currentSeconds();
+    double e_time = CycleTimer::currentSeconds();
     std::string& path = impl_->get_path();
     path = server + "/" + path;
     xdr::trace& trace = impl_->get_trace();
