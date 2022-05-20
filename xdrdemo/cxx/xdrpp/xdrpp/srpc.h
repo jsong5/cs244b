@@ -47,7 +47,7 @@ public:
     std::unique_ptr<typename P::res_type>>::type
   invoke(const A &...a) {
     rpc_msg hdr;
-    double_t start_time = CycleTimer::currentSeconds();
+    double start_time = CycleTimer::currentSeconds();
     std::cout << "[invoke] start_time: " << start_time << std::endl;
     prepare_call<P>(hdr);
     uint32_t xid = hdr.xid;

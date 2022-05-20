@@ -26,10 +26,10 @@ extern bool xdr_trace_server;
 //! Structure that gets marshalled as an RPC success header.
 struct rpc_success_hdr {
   uint32_t xid;
-  double_t e_time_;
+  double e_time_;
   xdr::xstring<> path_;
   rpc_success_hdr(uint32_t x) : xid(x), e_time_(0.0), path_("/EMPTY/") {}
-  rpc_success_hdr(uint32_t x, double_t end_time, xdr::xstring<> path)
+  rpc_success_hdr(uint32_t x, double end_time, xdr::xstring<> path)
                     : xid(x), e_time_(end_time), path_(path) {}
 };
 template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {

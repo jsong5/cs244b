@@ -113,7 +113,7 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
     std::map<TierServerIdentification, Client_Storage*>::iterator it = NextTierConnections.begin();
-    put_waiting = 2;
+    put_waiting = NextTierConnections.size();
     while(it != NextTierConnections.end())
     {
         Client_Storage* cs = it->second; //((xdr::arpc_client<KVTIERPROT>)(*(cs->client)))
@@ -157,7 +157,7 @@ KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 {
   
     std::map<TierServerIdentification, Client_Storage*>::iterator it = NextTierConnections.begin();
-    get_waiting = 2;
+    get_waiting = NextTierConnections.size();
     while(it != NextTierConnections.end())
     {
         Client_Storage* cs = it->second; //((xdr::arpc_client<KVTIERPROT>)(*(cs->client)))
@@ -205,7 +205,7 @@ void client_connection_psrun(xdr::pollset* ps)
 int
 main(int argc, char **argv)
 {
-    if (argc < 2 || argc > 4) {
+    if (argc < 2) {
         std::cerr << "usage: " << argv[0] << " [tierNum] [ServerNumInTier] [Islastserver]" << std::endl;
         exit(1);
     }
@@ -215,24 +215,41 @@ main(int argc, char **argv)
 
     //server Number in this tier
     std::uint32_t servernum = atoi(argv[2]);
-    
+
+    std::string nexttierlist = argv[2];
+
+    std::vector<std::string> all_args;
+    std::vector<std::uint32_t> next_tier_list;
+
+    std::cout << "nexttierlist: " << nexttierlist << std::endl;
+    std::vector<std::string>::iterator its;
+    std::vector<std::uint32_t>::iterator itn;
+    if (argc > 2) {
+      all_args.assign(argv + 2, argv + argc);
+    }
+    for(its = all_args.begin();its !=all_args.end();its++)
+    {
+      next_tier_list.push_back(std::stoi(*its));
+      std::cout << "all_args: " << *its << std::endl;
+    }
     std::cout << "tiernum_n: " << tiernum_n << ", servernum : "<< servernum << std::endl;  
-    std::cout << "Opening port: " << XDRDEMO_PORT+tiernum_n+servernum << std::endl;
+    std::cout << "Opening port: " << XDRDEMO_PORT+tiernum_n << std::endl;
     // Establish the socket to accept the requests from n-1 tier servers
     xdr::pollset ps;
-    xdr::unique_sock sock = xdr::tcp_listen((std::to_string(XDRDEMO_PORT+tiernum_n+servernum)).c_str());
+    xdr::unique_sock sock = xdr::tcp_listen((std::to_string(XDRDEMO_PORT+tiernum_n)).c_str());
     xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
     KVPROT1_master s;
     listen.register_service(s);
 
     // Establish the client-sockets to accept the requests from n+1 tier servers
-    for(std::uint32_t i = 0; i <= tiernum_n+1;i++)
+    //for(std::uint32_t i = 0; i <= tiernum_n+1;i++)
+    for(itn = next_tier_list.begin();itn !=next_tier_list.end();itn++)
     {
-        std::cout << "Connecting to next server on port: " << XDRDEMO_PORT+tiernum_n+1+i<< std::endl;  
+        std::cout << "Connecting to next server : "<< *itn << " on port: " << XDRDEMO_PORT+*itn<< std::endl;  
         Client_Storage* cs = new Client_Storage();  
-        cs->servertoconnectidentification = std::to_string(XDRDEMO_PORT+tiernum_n+1+i).c_str();      
-        cs->fd = xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT+tiernum_n+1+i).c_str());
+        cs->servertoconnectidentification = std::to_string(*itn).c_str();      
+        cs->fd = xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT+*itn).c_str());
         cs->ps = new xdr::pollset();
         cs->rpcsoc = new xdr::rpc_sock(*(cs->ps), cs->fd.release());
         cs->client = new xdr::arpc_client1<KVPROT1>(*cs->rpcsoc,cs->servertoconnectidentification);
