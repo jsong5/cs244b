@@ -117,8 +117,8 @@ class reply_cb_impl {
   trace trace_{};
 
 public:
-  template<typename CB> reply_cb_impl(uint32_t xid, CB &&cb, const char *name, std::string path)
-    : xid_(xid), cb_(std::forward<CB>(cb)), proc_name_(name), path_(path) {}
+  template<typename CB> reply_cb_impl(uint32_t xid, CB &&cb, const char *name)
+    : xid_(xid), cb_(std::forward<CB>(cb)), proc_name_(name), path_("") {}
   reply_cb_impl(const reply_cb_impl &rcb) = delete;
   reply_cb_impl &operator=(const reply_cb_impl &rcb) = delete;
   ~reply_cb_impl() { if (cb_) reject(PROC_UNAVAIL); }
@@ -176,18 +176,17 @@ public:
   double_t s_time_;
 
   reply_cb() {}
-  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name, std::string path)
-    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name, path)),
+  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name)
+    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
       s_time_(CycleTimer::currentSeconds()) {}
 
-  void operator()(const type &t, std::string caller = __builtin_FUNCTION()) const {
+  void operator()(const type &t, std::string server = __builtin_FUNCTION()) const {
+    std::cout << "[reply_cb operator()]" << std::endl;
     double_t e_time = CycleTimer::currentSeconds();
     std::string& path = impl_->get_path();
-    // Concatenate path here on reply_cb() calls
-    /* update path variable once all calls in one tier finish. Choose highest time for critical path. */
-    // path = caller + "/" + path;
+    path = server + "/" + path;
     xdr::trace& trace = impl_->get_trace();
-    trace[caller + "/" + path].push_back(e_time - s_time_); // insert the end time
+    trace[path].push_back(e_time - s_time_);
     impl_->send_reply(t);
   }
 
@@ -221,7 +220,6 @@ public:
   template<typename P>
   void dispatch(Session *session, rpc_msg &hdr, xdr_get &g, cb_t reply) {
     std::clog << "[dispatch]" << std::endl;
-    std::string path = "DISPATCH"; // init path.
     // consider changing order, since this will act as root when request first made.
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
@@ -236,7 +234,7 @@ public:
 
     dispatch_with_session<P>(server_, session, std::move(arg),
 			     reply_cb<typename P::res_type>{
-			       hdr.xid, std::move(reply), P::proc_name(), path});
+			       hdr.xid, std::move(reply), P::proc_name()});
   }
 
   arpc_service(T &server)
