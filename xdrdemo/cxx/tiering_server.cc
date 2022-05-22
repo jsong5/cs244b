@@ -148,7 +148,7 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
     
     //Just a simple static value sending back.
 
-  cb(SUCCESS, "Master"); // return value. Stands for callback I think
+  cb(SUCCESS, node_identifier); // return value. Stands for callback I think
   paths = {};
 }
 
@@ -240,6 +240,7 @@ main(int argc, char **argv)
     xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
     KVPROT1_master s;
+    s.node_identifier = "server" + std::to_string(tiernum_n);
     listen.register_service(s);
 
     // Establish the client-sockets to accept the requests from n+1 tier servers
