@@ -145,7 +145,6 @@ private:
       std::clog << std::endl;
     }
 
-    path_ = "/SEND_REPLY/" + path_;
     std::clog << "[send_reply] path: " << path_ << std::endl;
     if (xdr_trace_server) {
       std::string s = "REPLY ";
@@ -180,7 +179,7 @@ public:
     : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
       s_time_(CycleTimer::currentSeconds()) {}
 
-  void operator()(const type &t, std::string server = __builtin_FUNCTION()) const {
+  void operator()(const type &t, std::string server = "/server") const {
     std::cout << "[reply_cb operator()]" << std::endl;
     double_t e_time = CycleTimer::currentSeconds();
     std::string& path = impl_->get_path();
