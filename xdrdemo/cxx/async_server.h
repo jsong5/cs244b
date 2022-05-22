@@ -14,6 +14,7 @@ class KVPROT1_server {
   std::map<Key, Value> vals_;
 
 public:
+  std::string node_identifier;
   using rpc_interface_type = KVPROT1;
 
   KVPROT1_server() : id_("DEFAULT_PORT") {}

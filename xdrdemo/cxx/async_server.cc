@@ -28,7 +28,7 @@ KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
   double endTime = CycleTimer::currentSeconds();
   std::clog << "[kv_put] Time: " << (endTime - startTime) << std::endl;
   std::cout << "Server Side SET Key :" << *k << "Value : "<<vals_[*k]<< std::endl;
-  cb(SUCCESS, id_); // return value. Stands for callback I think
+  cb(SUCCESS, node_identifier); // return value. Stands for callback I think
 }
 
 void
@@ -69,6 +69,7 @@ main(int argc, char **argv)
   xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
   KVPROT1_server s(portno);
+  s.node_identifier = "server" + std::to_string(num);
   listen.register_service(s);
 
   ps.run();

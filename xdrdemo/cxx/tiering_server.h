@@ -19,9 +19,9 @@ typedef struct _Client_Storage {
 
 class KVPROT1_master {
   std::map<Key, Value> vals_;
-  
 public:
-    std::map<TierServerIdentification, Client_Storage*> NextTierConnections;
+  std::string node_identifier;
+  std::map<TierServerIdentification, Client_Storage*> NextTierConnections;
 
   using rpc_interface_type = KVPROT1;
 
