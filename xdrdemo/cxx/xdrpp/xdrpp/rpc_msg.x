@@ -92,8 +92,8 @@ struct accepted_reply {
   union switch (accept_stat stat) {
   case SUCCESS:
     struct {
-      unsigned hyper duds;
-      opaque porrky<8>;
+      double end_time;
+      opaque path<>;
       opaque results[0];
     } success;
     /*

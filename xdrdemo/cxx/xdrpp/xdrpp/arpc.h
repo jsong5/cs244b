@@ -8,6 +8,7 @@
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
 #include <xdrpp/srpc.h>	     // XXX xdr_trace_client
+#include "../CycleTimer.h"
 
 namespace xdr {
 
@@ -47,6 +48,7 @@ public:
     hdr.body.cbody().vers = P::interface_type::version;
     hdr.body.cbody().proc = P::proc;
 
+    std::clog << "[arpc invoke] hdr: " << hdr << std::endl;
     if (xdr_trace_client) {
       std::string s = "CALL ";
       s += P::proc_name();
@@ -101,6 +103,9 @@ template<typename T> using arpc_client =
 
 template<typename T> class reply_cb;
 
+using times = std::vector<double_t>;
+using trace = std::unordered_map<std::string, times>;
+
 namespace detail {
 class reply_cb_impl {
   template<typename T> friend class xdr::reply_cb;
@@ -108,13 +113,17 @@ class reply_cb_impl {
   uint32_t xid_;
   cb_t cb_;
   const char *const proc_name_;
+  std::string path_;
+  trace trace_{};
 
 public:
   template<typename CB> reply_cb_impl(uint32_t xid, CB &&cb, const char *name)
-    : xid_(xid), cb_(std::forward<CB>(cb)), proc_name_(name) {}
+    : xid_(xid), cb_(std::forward<CB>(cb)), proc_name_(name), path_("") {}
   reply_cb_impl(const reply_cb_impl &rcb) = delete;
   reply_cb_impl &operator=(const reply_cb_impl &rcb) = delete;
   ~reply_cb_impl() { if (cb_) reject(PROC_UNAVAIL); }
+  std::string& get_path() { return path_; }
+  trace& get_trace() { return trace_; }
 
 private:
   void send_reply_msg(msg_ptr &&b) {
@@ -124,13 +133,26 @@ private:
   }
 
   template<typename T> void send_reply(const T &t) {
+    trace& trace = get_trace();
+
+    std::clog << "[send_reply] TRACE" << std::endl;
+    for (auto& kv : trace) {
+      times timing = kv.second;
+      std::clog << "timing Info for " << kv.first << ": " << std::endl;
+      for (double_t it : timing) {
+        std::clog << it << ", ";
+      }
+      std::clog << std::endl;
+    }
+
+    std::clog << "[send_reply] path: " << path_ << std::endl;
     if (xdr_trace_server) {
       std::string s = "REPLY ";
       s += proc_name_;
       s += " -> [xid " + std::to_string(xid_) + "]";
       std::clog << xdr_to_string(t, s.c_str());
     }
-    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_), t));
+    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_, CycleTimer::currentSeconds(), path_), t));
   }
 
   void reject(accept_stat stat) {
@@ -150,14 +172,27 @@ template<typename T> class reply_cb {
 public:
   using type = T;
   std::shared_ptr<impl_t> impl_;
+  double_t s_time_;
 
   reply_cb() {}
   template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name)
-    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)) {}
+    : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
+      s_time_(CycleTimer::currentSeconds()) {}
 
-  void operator()(const type &t) const { impl_->send_reply(t); }
+  void operator()(const type &t, std::string server = "/server") const {
+    std::cout << "[reply_cb operator()]" << std::endl;
+    double_t e_time = CycleTimer::currentSeconds();
+    std::string& path = impl_->get_path();
+    path = server + "/" + path;
+    xdr::trace& trace = impl_->get_trace();
+    trace[path].push_back(e_time - s_time_);
+    impl_->send_reply(t);
+  }
+
   void reject(accept_stat stat) const { impl_->reject(stat); }
   void reject(auth_stat stat) const { impl_->reject(stat); }
+  std::string& get_path() { return impl_->get_path(); }
+  trace& get_trace() { return impl_->get_trace(); }
 };
 template<> class reply_cb<void> : public reply_cb<xdr_void> {
 public:
@@ -183,6 +218,8 @@ public:
 
   template<typename P>
   void dispatch(Session *session, rpc_msg &hdr, xdr_get &g, cb_t reply) {
+    std::clog << "[dispatch]" << std::endl;
+    // consider changing order, since this will act as root when request first made.
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));

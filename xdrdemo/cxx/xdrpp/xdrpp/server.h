@@ -26,16 +26,19 @@ extern bool xdr_trace_server;
 //! Structure that gets marshalled as an RPC success header.
 struct rpc_success_hdr {
   uint32_t xid;
-  explicit constexpr rpc_success_hdr(uint32_t x) : xid(x) {}
+  double_t e_time_;
+  xdr::xstring<> path_;
+  rpc_success_hdr(uint32_t x) : xid(x), e_time_(0.0), path_("/EMPTY/") {}
+  rpc_success_hdr(uint32_t x, double_t end_time, xdr::xstring<> path)
+                    : xid(x), e_time_(end_time), path_(path) {}
 };
 template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {
   static constexpr bool valid = true;
   static constexpr bool is_class = true;
   static constexpr bool is_struct = true;
-  static constexpr bool has_fixed_size = true;
-  static constexpr std::size_t fixed_size = 24 + 8 + 4 + 8;
-  static constexpr std::size_t serial_size(const rpc_success_hdr &) {
-    return fixed_size;
+
+  static std::size_t serial_size(const rpc_success_hdr &t) {
+    return 32 + xdr_size(t.path_);
   }
   template<typename Archive> static void save(Archive &a,
 					      const rpc_success_hdr &t) {
@@ -45,10 +48,9 @@ template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {
     archive(a, AUTH_NONE, "flavor");
     archive(a, uint32_t(0), "body");
     archive(a, SUCCESS, "stat");
-    archive(a, uint64_t(0), "duds");
-    xstring<8> alpha = "Porky";
-    std::cerr << "size: " << alpha.max_size() << std::endl;
-    archive(a, alpha, "porrky");
+    archive(a, t.e_time_, "end_time");
+    archive(a, t.path_, "path");
+    std::clog << "[save] path: " << t.path_ << std::endl;
   }
 };
 
