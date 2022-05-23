@@ -20,7 +20,6 @@
 // Allows you to pretty-print XDR with <<
 using xdr::operator<<;
 
-
 void
 get_cb(xdr::call_result<GetRes> res, std::string p)
 {
@@ -52,11 +51,10 @@ main(int argc, char **argv)
   xdr::rpc_sock s(ps, fd.release());
   xdr::arpc_client<KVPROT1> client(s, "client_original"); // async rpc with application version feeing it the fd and ps we had. Inittializes client
 
-  if (argc == 2) // this is putting
+  if (argc == 2) // For get
     client.kv_get(Key(argv[1]), get_cb); // Client thing
 
-  else if (argc == 3) // this is seting
-    //std::cout << "RPC error: " << argv << std::endl;
+  else if (argc == 3) // For put
     client.kv_put(Key(argv[1]), Value(argv[2]),
 		  [](xdr::call_result<Status> res, std::string p) {
 		    if (!res) {

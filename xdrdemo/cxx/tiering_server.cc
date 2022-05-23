@@ -7,52 +7,57 @@
 uint32_t get_waiting = 0;
 uint32_t put_waiting = 0;
 uint64_t max_time = 0;
-std::string max_path = "/";
-std::vector<Value> get_values; // should be the same value across tiers, right?
+Value last_get;
+std::string critical_path = "/";
 std::vector<xdr::xstring<>> paths;
 std::vector<std::uint64_t> times;
+
+
+void process_timing(std::string p, std::uint64_t time) {
+  if (time > max_time) {
+      max_time = time;
+      critical_path = p;
+  }
+  if (!p.empty()) {
+    paths.push_back(p);
+    times.push_back(time);
+  }
+}
 
 // Call back from one server to other
 void
 get_cb(xdr::call_result<GetRes> res, std::string p, std::uint64_t time)
 {
-  //get_connectionport();
+  // Handle tracing
+  process_timing(p, time);
+  get_waiting--;
+
+  // Handle reply
   if (res) {
     if (res->stat() != SUCCESS) {
       std::cerr << "Error: " << res->stat();
     }
-    std::cout << "get_cb client value: " << res->value() << std::endl;
-    get_values.push_back(res->value());
-    if (!p.empty()) {
-      paths.push_back(p);
-    }
+    last_get = res->value();
   } else {
     std::cerr << "RPC error: " << res.message() << std::endl;
   }
-  get_waiting--;
 }
 
 void
 put_cb(xdr::call_result<Status> res, std::string p, std::uint64_t time)
 {
-    std::cout << "put_cb client path: " << p << std::endl;
-    if (time > max_time) {
-      max_time = time;
-      max_path = p;
-    }
-    if (!p.empty()) {
-      paths.push_back(p);
-      times.push_back(time);
-    }
-    put_waiting--;
-
-    if (!res) {
-      std::cerr << "RPC error: " << res.message() << std::endl;
-      exit(1);
-    } else if (*res != SUCCESS) {
-      std::cerr << "Error: " << *res << std::endl;
-      exit(1);
-    }
+  // Handle tracing
+  process_timing(p, time);
+  put_waiting--;
+  
+  // Handle reply
+  if (!res) {
+    std::cerr << "RPC error: " << res.message() << std::endl;
+    exit(1);
+  } else if (*res != SUCCESS) {
+    std::cerr << "Error: " << *res << std::endl;
+    exit(1);
+  }
 }
 
 void
@@ -65,88 +70,47 @@ void
 KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
+    // Make containers for all the outbound requests and their sockets
     std::map<TierServerIdentification, Client_Storage*>::iterator it = NextTierConnections.begin();
     put_waiting = NextTierConnections.size();
     while(it != NextTierConnections.end())
     {
-        Client_Storage* cs = it->second; //((xdr::arpc_client<KVTIERPROT>)(*(cs->client)))
-        xdr::arpc_client1<KVPROT1> *client = cs->client;
-        std::cout << "kvtier_put client: " << cs->servertoconnectidentification << std::endl;
-        std::cout << "kvtier_put key: " << *k << std::endl;
+        Client_Storage* cs = it->second;
+        xdr::arpc_client_tier<KVPROT1> *client = cs->client;
         client->kv_put(Key(*k),Value(*v),put_cb);
-
         it++;
     }
-    std::cout << "put_waiting before: " << put_waiting << std::endl;
+
+    // We block on the longest request (still can process requests in parallel).
     while(put_waiting > 0){}
-    std::cout << "put_waiting after: " << put_waiting << std::endl;
-    //kvtier_get(k,v,cb);
-    
-    std::cout << "paths: ";
-    for (auto p : paths) {
-      std::cout << p << ", ";
-    }
-    std::cout << std::endl;
 
-    std::cout << "times: ";
-    for (auto t : times) {
-      std::cout << t << ", ";
-    }
-    std::cout << std::endl;
-
-    auto critical_path = max_path;
-    std::cout << "[crit path] " << critical_path << std::endl;
-
-    std::cout << "[cb get path] " << cb.get_path() << std::endl;
+    // Retrieve critical path after handling.
     cb.get_path() = critical_path;
-    //Placeholder to perform the critical path handling
-    
-    //Need the handling for the get here to perfrom the handling 
-    //Take all the replies provided by the next-tier servers and
-    //Calculate the critical path and send the response value back to the prev-tier servers
-    
-    //Just a simple static value sending back.
-
   cb(SUCCESS, node_identifier, 0); // return value. Stands for callback I think
+  // Clear paths tracker
   paths = {};
 }
 
 void
 KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 {
-  
+  // Make containers for all the outbound requests and their sockets
     std::map<TierServerIdentification, Client_Storage*>::iterator it = NextTierConnections.begin();
     get_waiting = NextTierConnections.size();
     while(it != NextTierConnections.end())
     {
-        Client_Storage* cs = it->second; //((xdr::arpc_client<KVTIERPROT>)(*(cs->client)))
-        xdr::arpc_client1<KVPROT1> *client = cs->client;
-        std::cout << "kvtier_get client: " << cs->servertoconnectidentification << std::endl;
-        std::cout << "kvtier_get key :" << *k << std::endl;
+        Client_Storage* cs = it->second;
+        xdr::arpc_client_tier<KVPROT1> *client = cs->client;
         client->kv_get(Key(*k),get_cb);
         it++;
     }
     
-    std::cout << "get_waiting before: " << get_waiting << std::endl;
+    // Block on longest rrequest
     while(get_waiting > 0){}
-    std::cout << "get_waiting after: " << get_waiting << std::endl;
-    
-    //Placeholder to perform the critical path handling
-    
-    //Need the handling for the get here to perfrom the handling 
-    //Take all the replies provided by the next-tier servers and
-    //Calculate the critical path and send the response value back to the prev-tier servers
-    
-    /* All tiers should return the same value, so get_values as a vector may be
-    redundant. Added in case we want to process all the values to check for errs. */
-    if (get_values.empty()) {
-      GetRes res(NOTFOUND);
-      cb(res);
-    } else {
-      GetRes res(SUCCESS);	// (Redundant, 0 is default)
-      res.value() = get_values[0];
-      cb(res);
-    }
+
+    GetRes res(SUCCESS);	// (Redundant, 0 is default)
+    res.value() = last_get;
+    cb(res);
     paths = {};
 }
 
@@ -168,19 +132,14 @@ main(int argc, char **argv)
         std::cerr << "usage: " << argv[0] << " [tierNum] [ServerNumInTier] [Islastserver]" << std::endl;
         exit(1);
     }
-    std::cout << "argv[0]: " << argv[0] << ", argv[1]: "<< argv[1] << ", argv[2]: " << argv[2] << std::endl;  
-    //tier Number
-    std::uint32_t tiernum_n = atoi(argv[1]);
+    //Identification number for this tier server
+    std::uint32_t tier_identifier = atoi(argv[1]);
 
-    //server Number in this tier
-    std::uint32_t servernum = atoi(argv[2]);
-
-    std::string nexttierlist = argv[2];
-
+    // Argument holder
     std::vector<std::string> all_args;
     std::vector<std::uint32_t> next_tier_list;
 
-    std::cout << "nexttierlist: " << nexttierlist << std::endl;
+    // Iterators for traversal
     std::vector<std::string>::iterator its;
     std::vector<std::uint32_t>::iterator itn;
     if (argc > 2) {
@@ -189,21 +148,18 @@ main(int argc, char **argv)
     for(its = all_args.begin();its !=all_args.end();its++)
     {
       next_tier_list.push_back(std::stoi(*its));
-      std::cout << "all_args: " << *its << std::endl;
     }
-    std::cout << "tiernum_n: " << tiernum_n << ", servernum : "<< servernum << std::endl;  
-    std::cout << "Opening port: " << XDRDEMO_PORT+tiernum_n << std::endl;
+
     // Establish the socket to accept the requests from n-1 tier servers
     xdr::pollset ps;
     xdr::unique_sock sock = xdr::tcp_listen((std::to_string(XDRDEMO_PORT+tiernum_n)).c_str());
     xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
     KVPROT1_master s;
-    s.node_identifier = "server" + std::to_string(tiernum_n);
+    s.node_identifier = "server" + std::to_string(tier_identifier);
     listen.register_service(s);
 
     // Establish the client-sockets to accept the requests from n+1 tier servers
-    //for(std::uint32_t i = 0; i <= tiernum_n+1;i++)
     for(itn = next_tier_list.begin();itn !=next_tier_list.end();itn++)
     {
         std::cout << "Connecting to next server : "<< *itn << " on port: " << XDRDEMO_PORT+*itn<< std::endl;  
@@ -212,7 +168,7 @@ main(int argc, char **argv)
         cs->fd = xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT+*itn).c_str());
         cs->ps = new xdr::pollset();
         cs->rpcsoc = new xdr::rpc_sock(*(cs->ps), cs->fd.release());
-        cs->client = new xdr::arpc_client1<KVPROT1>(*cs->rpcsoc, cs->servertoconnectidentification, s.node_identifier);
+        cs->client = new xdr::arpc_client_tier<KVPROT1>(*cs->rpcsoc, cs->servertoconnectidentification, s.node_identifier);
 
         //Place the Object into the server connections map.
         s.kvtier_setconnections(cs);
@@ -220,7 +176,7 @@ main(int argc, char **argv)
          cs->thrd = new std::thread(client_connection_psrun, cs->ps);
     }
 
-    std::cout << "----------------------Start running---------------------------"<< std::endl;  
+    std::cout << "[tiering_server main] Server Started"<< std::endl;  
         
     ps.run();
 
@@ -228,15 +184,13 @@ main(int argc, char **argv)
 
     while(it != s.NextTierConnections.end())
     {
-        Client_Storage* cs = it->second; //((xdr::arpc_client<KVTIERPROT>)(*(cs->client)))
-        xdr::arpc_client1<KVPROT1> *client = cs->client;
-        std::cout << "kvtier_get client: " << cs->servertoconnectidentification << std::endl; 
-        //std::cout << "kvtier_get  key:" << *k << std::endl; 
+        Client_Storage* cs = it->second;
+        xdr::arpc_client_tier<KVPROT1> *client = cs->client;
         cs->thrd->join();
         it++;
     }
 
-    std::cout << "-----------------------end running------------------------------"<< std::endl;  
+    std::cout << "[tiering_server main] Server Terminated"<< std::endl;  
 
     return 0;
 }
