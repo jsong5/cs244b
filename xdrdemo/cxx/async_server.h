@@ -10,7 +10,7 @@
 #include "kvprot.hh"
 
 class KVPROT1_server {
-  TierServerIdentification id_;
+  TierServerID id_;
   std::map<Key, Value> vals_;
 
 public:
@@ -19,7 +19,7 @@ public:
 
   KVPROT1_server() : id_("DEFAULT_PORT") {}
 
-  KVPROT1_server(uint32_t portno) : id_(std::to_string(portno).c_str()) {}
+  KVPROT1_server(uint32_t portno, std::string identifier) : id_(std::to_string(portno).c_str()), node_identifier(identifier) {}
 
   void kv_null(xdr::reply_cb<void> cb);
   void kv_put(std::unique_ptr<Key> arg1, std::unique_ptr<Value> arg2,

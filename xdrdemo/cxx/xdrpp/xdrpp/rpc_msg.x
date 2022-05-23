@@ -15,10 +15,6 @@ struct opaque_auth {
   opaque body<400>;
 };
 
-struct opaque_trace {
-  opaque body<>;
-};
-
 enum msg_type {
   CALL  = 0,
   REPLY = 1
