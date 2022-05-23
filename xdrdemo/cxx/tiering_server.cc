@@ -71,7 +71,7 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
     // Make containers for all the outbound requests and their sockets
-    std::map<TierServerIdentification, Client_Storage*>::iterator it = NextTierConnections.begin();
+    std::map<TierServerID, Client_Storage*>::iterator it = NextTierConnections.begin();
     put_waiting = NextTierConnections.size();
     while(it != NextTierConnections.end())
     {
@@ -95,7 +95,7 @@ void
 KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 {
   // Make containers for all the outbound requests and their sockets
-    std::map<TierServerIdentification, Client_Storage*>::iterator it = NextTierConnections.begin();
+    std::map<TierServerID, Client_Storage*>::iterator it = NextTierConnections.begin();
     get_waiting = NextTierConnections.size();
     while(it != NextTierConnections.end())
     {
@@ -112,17 +112,6 @@ KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
     res.value() = last_get;
     cb(res);
     paths = {};
-}
-
-void
-KVPROT1_master::kvtier_setconnections(Client_Storage* cs)
-{
-  NextTierConnections[cs->servertoconnectidentification] = cs;
-}
-
-void client_connection_psrun(xdr::pollset* ps)
-{
-    ps->run();
 }
 
 int
@@ -152,7 +141,7 @@ main(int argc, char **argv)
 
     // Establish the socket to accept the requests from n-1 tier servers
     xdr::pollset ps;
-    xdr::unique_sock sock = xdr::tcp_listen((std::to_string(XDRDEMO_PORT+tiernum_n)).c_str());
+    xdr::unique_sock sock = xdr::tcp_listen((std::to_string(XDRDEMO_PORT+tier_identifier)).c_str());
     xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
     KVPROT1_master s;
@@ -180,7 +169,7 @@ main(int argc, char **argv)
         
     ps.run();
 
-    std::map<TierServerIdentification, Client_Storage*>::iterator it = s.NextTierConnections.begin();
+    std::map<TierServerID, Client_Storage*>::iterator it = s.NextTierConnections.begin();
 
     while(it != s.NextTierConnections.end())
     {

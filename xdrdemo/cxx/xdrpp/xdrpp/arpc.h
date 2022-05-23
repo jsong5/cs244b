@@ -4,6 +4,8 @@
 
 #ifndef _XDRPP_ARPC_H_HEADER_INCLUDED_
 #define _XDRPP_ARPC_H_HEADER_INCLUDED_ 1
+#define _DEFAULT_ASYNC_NODE_NAME "node"
+#define SIG_FIG 10000;
 
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
@@ -38,8 +40,8 @@ class asynchronous_client_base {
   rpc_sock &s_;
   std::string node_name;
 
-
 public:
+  asynchronous_client_base(rpc_sock &s) : s_(s), node_name(_DEFAULT_ASYNC_NODE_NAME) {}
   asynchronous_client_base(rpc_sock &s, std::string identifier) : s_(s), node_name(identifier) {}
   asynchronous_client_base(asynchronous_client_base &c) : s_(c.s_), node_name(c.node_name){}
 
@@ -219,10 +221,12 @@ private:
   template<typename T> void send_reply(const T &t) {
     trace& trace = get_trace();
 
-    int sigfig = 10000;
+    
     // Quantized time tracker
     double total_time = CycleTimer::currentSeconds() - service_time;
-    total_time = sigfig * total_time;
+
+    double acc = SIG_FIG;
+    total_time = acc * total_time;
     std::uint64_t packaged_time = std::ceil(total_time);
 
     if (xdr_trace_server) {

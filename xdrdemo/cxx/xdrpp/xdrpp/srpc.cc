@@ -8,7 +8,7 @@
 
 namespace xdr {
 
-bool xdr_trace_client = true;//std::getenv("XDR_TRACE_CLIENT");
+bool xdr_trace_client = std::getenv("XDR_TRACE_CLIENT");
 
 static ssize_t
 fullread(sock_t s, void *buf, size_t n)
@@ -77,7 +77,6 @@ prepare_call(uint32_t prog, uint32_t vers, uint32_t proc, rpc_msg &hdr)
   hdr.body.cbody().prog = prog;
   hdr.body.cbody().vers = vers;
   hdr.body.cbody().proc = proc;
-  //hdr.body.cbody().tracing = 1000;
 }
 
 void

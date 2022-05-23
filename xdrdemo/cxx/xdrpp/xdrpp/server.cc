@@ -4,7 +4,7 @@
 
 namespace xdr {
 
-bool xdr_trace_server = true;//std::getenv("XDR_TRACE_SERVER");
+bool xdr_trace_server = std::getenv("XDR_TRACE_SERVER");
 
 msg_ptr
 rpc_accepted_error_msg(uint32_t xid, accept_stat stat)

@@ -39,7 +39,7 @@ void
 msg_sock::input()
 {
   std::shared_ptr<bool> destroyed{destroyed_};
-  for (int i = 0; i < 3 && !*destroyed; i++) {    
+  for (int i = 0; i < 3 && !*destroyed; i++) {
     if (rdmsg_) {
       iovec iov[2];
       iov[0].iov_base = rdmsg_->data() + rdpos_;
@@ -48,34 +48,34 @@ msg_sock::input()
       iov[1].iov_len = sizeof nextlen_;
       ssize_t n = readv(s_, iov, 2);
       if (n <= 0) {
-          if (n < 0 && eagain(errno))
-            return;
-          if (n == 0)
-            errno = ECONNRESET;
-          else
-            std::cerr << "msg_sock::input: " << sock_errmsg() << std::endl;
-          rcb_(nullptr);
-          return;
+	if (n < 0 && eagain(errno))
+	  return;
+	if (n == 0)
+	  errno = ECONNRESET;
+	else
+	  std::cerr << "msg_sock::input: " << sock_errmsg() << std::endl;
+	rcb_(nullptr);
+	return;
       }
       rdpos_ += n;
       if (rdpos_ >= rdmsg_->size()) {
-        rdpos_ -= rdmsg_->size();
-        rcb_(std::move(rdmsg_));
-        if (*destroyed)
-          return;
+	rdpos_ -= rdmsg_->size();
+	rcb_(std::move(rdmsg_));
+	if (*destroyed)
+	  return;
       }
     }
     else if (rdpos_ < sizeof nextlen_) {
       ssize_t n = read(s_, nextlenp() + rdpos_, sizeof nextlen_ - rdpos_);
       if (n <= 0) {
-        if (n < 0 && eagain(errno))
-          return;
-        if (n == 0)
-          errno = rdpos_ ? ECONNRESET : 0;
-        else
-          std::cerr << "msg_sock::input: " << sock_errmsg() << std::endl;
-        rcb_(nullptr);
-        return;
+	if (n < 0 && eagain(errno))
+	  return;
+	if (n == 0)
+	  errno = rdpos_ ? ECONNRESET : 0;
+	else
+	  std::cerr << "msg_sock::input: " << sock_errmsg() << std::endl;
+	rcb_(nullptr);
+	return;
       }
       rdpos_ += n;
     }
@@ -100,7 +100,8 @@ msg_sock::input()
       // Length comes from untrusted source; don't crash if can't alloc
       try { rdmsg_ = message_t::alloc(len); }
       catch (const std::bad_alloc &) {
-	          std::cerr << "msg_sock: allocation of " << len << "-byte message failed"<< std::endl;
+	std::cerr << "msg_sock: allocation of " << len << "-byte message failed"
+		  << std::endl;
       }
     }
     else {
@@ -204,10 +205,10 @@ rpc_sock::recv_msg(msg_ptr b)
   if (!b || b->size() < 8) {
     abort_all_calls();
     recv_call(nullptr);
-    return;
-  } else if (b->word(1) == swap32le(CALL)) {
+  }
+  else if (b->word(1) == swap32le(CALL))
     recv_call(std::move(b));
-  } else if (b->word(1) == swap32le(REPLY)) {
+  else if (b->word(1) == swap32le(REPLY)) {
     auto calli = calls_.find(b->word(0));
     if (calli == calls_.end()) {
       std::cerr << "ignoring reply to unknown call" << std::endl;

@@ -63,8 +63,7 @@ main(int argc, char **argv)
   xdr::unique_sock sock = xdr::tcp_listen(std::to_string(portno).c_str());
   xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
-  KVPROT1_server s(portno);
-  s.node_identifier = "server" + std::to_string(num);
+  KVPROT1_server s(portno, "server" + std::to_string(num));
   listen.register_service(s);
 
   ps.run();

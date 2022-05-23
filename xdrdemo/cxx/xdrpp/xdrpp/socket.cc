@@ -1,7 +1,6 @@
 #include <cstring>
 #include <string>
 #include <xdrpp/socket.h>
-#include <iostream>
 
 namespace xdr {
 

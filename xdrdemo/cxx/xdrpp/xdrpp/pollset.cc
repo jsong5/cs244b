@@ -232,24 +232,24 @@ pollset::poll(int timeout)
       --r;
     if (pfp->revents & (POLLIN|POLLHUP|POLLERR) && fi.rcb) {
       if (fi.roneshot) {
-            cb_t cb {std::move(fi.rcb)};
-            fi.rcb = nullptr;
-            pfp->events &= ~POLLIN;
-            cb();
+	cb_t cb {std::move(fi.rcb)};
+	fi.rcb = nullptr;
+	pfp->events &= ~POLLIN;
+	cb();
       }
       else
-	      fi.rcb();
+	fi.rcb();
     }
     pfp = &pollfds_.at(i); // callback might have resized vector
     if (pfp->revents & (POLLOUT|POLLHUP|POLLERR) && fi.wcb) {
       if (fi.woneshot) {
-          cb_t cb {std::move(fi.wcb)};
-          fi.wcb = nullptr;
-          pfp->events &= ~POLLOUT;
-          cb();
+	cb_t cb {std::move(fi.wcb)};
+	fi.wcb = nullptr;
+	pfp->events &= ~POLLOUT;
+	cb();
       }
       else
-	      fi.wcb();
+	fi.wcb();
     }
   }
 
