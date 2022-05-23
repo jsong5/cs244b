@@ -4,14 +4,18 @@
 
 #ifndef _XDRPP_ARPC_H_HEADER_INCLUDED_
 #define _XDRPP_ARPC_H_HEADER_INCLUDED_ 1
+#define _DEFAULT_ASYNC_NODE_NAME "node"
+#define SIG_FIG 10000;
 
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
 #include <xdrpp/srpc.h>	     // XXX xdr_trace_client
 #include "../CycleTimer.h"
 
-namespace xdr {
+static double service_time;
 
+namespace xdr {
+std::string DEFAULT_PORT ("DEFAULT_PORT");
 //! A \c unique_ptr to a call result, or NULL if the call failed (in
 //! which case \c message returns an error message).
 template<typename T> struct call_result : std::unique_ptr<T> {
@@ -34,21 +38,97 @@ template<> struct call_result<void> {
 
 class asynchronous_client_base {
   rpc_sock &s_;
+  std::string node_name;
 
 public:
-  asynchronous_client_base(rpc_sock &s) : s_(s) {}
-  asynchronous_client_base(asynchronous_client_base &c) : s_(c.s_) {}
+  asynchronous_client_base(rpc_sock &s) : s_(s), node_name(_DEFAULT_ASYNC_NODE_NAME) {}
+  asynchronous_client_base(rpc_sock &s, std::string identifier) : s_(s), node_name(identifier) {}
+  asynchronous_client_base(asynchronous_client_base &c) : s_(c.s_), node_name(c.node_name){}
 
   template<typename P, typename...A>
   void invoke(const A &...a,
-	      std::function<void(call_result<typename P::res_type>)> cb) {
+	      std::function<void(call_result<typename P::res_type>, std::string)> cb) {
+    rpc_msg hdr { s_.get_xid(),CALL };
+    hdr.body.cbody().rpcvers = 2;
+    hdr.body.cbody().prog = P::interface_type::program;
+    hdr.body.cbody().vers = P::interface_type::version;
+    hdr.body.cbody().proc = P::proc;
+
+    if (xdr_trace_client) {
+      std::string s = "CALL ";
+      s += P::proc_name();
+      s += " -> [xid ";
+      s += std::to_string(hdr.xid);
+      s += "]";      
+      std::clog << xdr_to_string(std::tie(a...), s.c_str());
+    }
+
+    s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
+      if (!m)
+          return cb(rpc_call_stat::NETWORK_ERROR, "");
+        
+      try {
+        xdr_get g(m);
+        rpc_msg hdr;
+        archive(g, hdr);
+        call_result<typename P::res_type> res(hdr);
+        if (res)
+        {
+          archive(g, *res);
+        }
+        g.done();
+
+        if (xdr_trace_client) {
+          std::string s = "REPLY ";
+          s += P::proc_name();
+          s += " <- [xid " + std::to_string(hdr.xid) + "]";
+          if (res)
+            std::clog << xdr_to_string(*res, s.c_str());
+          else {
+            s += ": ";
+            s += res.message();
+            s += "\n";
+            std::clog << s;
+          }
+        }
+        cb(std::move(res), "");
+      }
+      catch (const xdr_runtime_error &e) {
+        cb(rpc_call_stat::GARBAGE_RES, "");
+      }
+    });
+  }
+
+  asynchronous_client_base *operator->() { return this; }
+};
+
+template<typename T> using arpc_client =
+  typename T::template _xdr_client<asynchronous_client_base>;
+
+class asynchronous_client_base_tier {
+  rpc_sock &s_;
+  xdr::xstring<64U> connect_port_;
+  std::string node_name;
+
+public:
+  asynchronous_client_base_tier(rpc_sock &s, xdr::xstring<64U> connect_port, std::string id) : s_(s),connect_port_(connect_port), node_name(id) {}
+  asynchronous_client_base_tier(rpc_sock &s, std::string id) : s_(s),connect_port_(DEFAULT_PORT), node_name(id) {}
+  asynchronous_client_base_tier(asynchronous_client_base_tier &c) : s_(c.s_),connect_port_(c.connect_port_), node_name(c.node_name) {}
+  
+  xdr::xstring<64U> get_connectionport()
+  {
+    return connect_port_;
+  }
+
+  template<typename P, typename...A>
+  void invoke(const A &...a,
+	      std::function<void(call_result<typename P::res_type>, std::string, std::uint64_t)> cb) {
     rpc_msg hdr { s_.get_xid(), CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
     hdr.body.cbody().vers = P::interface_type::version;
     hdr.body.cbody().proc = P::proc;
 
-    std::clog << "[arpc invoke] hdr: " << hdr << std::endl;
     if (xdr_trace_client) {
       std::string s = "CALL ";
       s += P::proc_name();
@@ -59,51 +139,57 @@ public:
     }
 
     s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
-	if (!m)
-	  return cb(rpc_call_stat::NETWORK_ERROR);
-	try {
-	  xdr_get g(m);
-	  rpc_msg hdr;
-	  archive(g, hdr);
-	  call_result<typename P::res_type> res(hdr);
-	  if (res)
-	    archive(g, *res);
-	  g.done();
+      std::string scc = "XXXXX";
+      if (!m)
+      {
+        return cb(rpc_call_stat::NETWORK_ERROR, "", 0);
+      }
+      try {
+        xdr_get g(m);
+        rpc_msg hdr;
+        archive(g, hdr);
+        call_result<typename P::res_type> res(hdr);
+        auto path = hdr.body.rbody().areply().reply_data.success().path;
+        std::uint64_t path_time = hdr.body.rbody().areply().reply_data.success().end_time;
 
-	  if (xdr_trace_client) {
-	    std::string s = "REPLY ";
-	    s += P::proc_name();
-	    s += " <- [xid " + std::to_string(hdr.xid) + "]";
-	    if (res)
-	      std::clog << xdr_to_string(*res, s.c_str());
-	    else {
-	      s += ": ";
-	      s += res.message();
-	      s += "\n";
-	      std::clog << s;
-	    }
-	  }
+        if (res)
+        {
+          archive(g, *res);
+        }
+        g.done();
 
-	  cb(std::move(res));
-	}
-	catch (const xdr_runtime_error &e) {
-	  cb(rpc_call_stat::GARBAGE_RES);
-	}
-      });
+        if (xdr_trace_client) {
+          std::string s = "REPLY ";
+          s += P::proc_name();
+          s += " <- [xid " + std::to_string(hdr.xid) + "]";
+          if (res)
+            std::clog << xdr_to_string(*res, s.c_str());
+          else {
+            s += ": ";
+            s += res.message();
+            s += "\n";
+            std::clog << s;
+          }
+        }
+        
+        cb(std::move(res), path, path_time);
+      }
+      catch (const xdr_runtime_error &e) {
+        cb(rpc_call_stat::GARBAGE_RES, "", 0);
+      }
+    });
   }
 
-  asynchronous_client_base *operator->() { return this; }
+  asynchronous_client_base_tier *operator->() { return this; }
 };
 
-template<typename T> using arpc_client =
-  typename T::template _xdr_client<asynchronous_client_base>;
-
+template<typename T> using arpc_client_tier =
+  typename T::template _xdr_client<asynchronous_client_base_tier>;
 
 // And now for the server
-
 template<typename T> class reply_cb;
 
-using times = std::vector<double_t>;
+using times = std::vector<double>;
 using trace = std::unordered_map<std::string, times>;
 
 namespace detail {
@@ -135,24 +221,21 @@ private:
   template<typename T> void send_reply(const T &t) {
     trace& trace = get_trace();
 
-    std::clog << "[send_reply] TRACE" << std::endl;
-    for (auto& kv : trace) {
-      times timing = kv.second;
-      std::clog << "timing Info for " << kv.first << ": " << std::endl;
-      for (double_t it : timing) {
-        std::clog << it << ", ";
-      }
-      std::clog << std::endl;
-    }
+    
+    // Quantized time tracker
+    double total_time = CycleTimer::currentSeconds() - service_time;
 
-    std::clog << "[send_reply] path: " << path_ << std::endl;
+    double acc = SIG_FIG;
+    total_time = acc * total_time;
+    std::uint64_t packaged_time = std::ceil(total_time);
+    
     if (xdr_trace_server) {
       std::string s = "REPLY ";
       s += proc_name_;
       s += " -> [xid " + std::to_string(xid_) + "]";
       std::clog << xdr_to_string(t, s.c_str());
     }
-    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_, CycleTimer::currentSeconds(), path_), t));
+    send_reply_msg(xdr_to_msg(rpc_success_hdr(xid_, total_time, path_), t));
   }
 
   void reject(accept_stat stat) {
@@ -172,20 +255,19 @@ template<typename T> class reply_cb {
 public:
   using type = T;
   std::shared_ptr<impl_t> impl_;
-  double_t s_time_;
+  double s_time_;
 
   reply_cb() {}
   template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name)
     : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
       s_time_(CycleTimer::currentSeconds()) {}
 
-  void operator()(const type &t, std::string server = "/server") const {
-    std::cout << "[reply_cb operator()]" << std::endl;
-    double_t e_time = CycleTimer::currentSeconds();
+void operator()(const type &t, std::string server = __builtin_FUNCTION(), std::uint64_t time = 0) const {
+    double e_time = CycleTimer::currentSeconds();
     std::string& path = impl_->get_path();
     path = server + "/" + path;
     xdr::trace& trace = impl_->get_trace();
-    trace[path].push_back(e_time - s_time_);
+    trace[path].push_back(e_time - s_time_); // insert the end time
     impl_->send_reply(t);
   }
 
@@ -223,13 +305,14 @@ public:
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
-
+    
     if (xdr_trace_server) {
-      std::string s = "CALL ";
+      std::string s = "CALL START";
       s += P::proc_name();
       s += " <- [xid " + std::to_string(hdr.xid) + "]";
       std::clog << xdr_to_string(arg, s.c_str());
     }
+    service_time = CycleTimer::currentSeconds();
 
     dispatch_with_session<P>(server_, session, std::move(arg),
 			     reply_cb<typename P::res_type>{
