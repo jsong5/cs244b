@@ -13,7 +13,7 @@ typedef struct _Client_Storage {
     xdr::unique_sock fd; 
     xdr::pollset *ps;
     xdr::rpc_sock *rpcsoc;
-    xdr::arpc_client1<KVPROT1> *client;
+    xdr::arpc_client_tier<KVPROT1> *client;
     std::thread *thrd;
 } Client_Storage;
 

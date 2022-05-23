@@ -50,7 +50,6 @@ public:
   invoke(const A &...a) {
     rpc_msg hdr;
     double start_time = CycleTimer::currentSeconds();
-    std::cout << "[invoke] start_time: " << start_time << std::endl;
     prepare_call<P>(hdr);
     uint32_t xid = hdr.xid;
     
@@ -59,7 +58,6 @@ public:
       s += P::proc_name();
       s += " -> [xid " + std::to_string(xid) + "]";
       s += " -> [tracing ";
-      //s += std::to_string(hdr.tracing);
       s += "]";
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
@@ -73,16 +71,14 @@ public:
       throw xdr_runtime_error("synchronous_client: unexpected xid");
     
     pointer<typename P::res_wire_type> r;
-    std::cerr << "[invoke] reply body: " << hdr.body.rbody().areply() << std::endl;
-    std::cerr << "[invoke] path: " << hdr.body.rbody().areply().reply_data.success().path.data() << std::endl;
     archive(g, r.activate());
     g.done();
+
     if (xdr_trace_client) {
       std::string s = "REPLY ";
       s += P::proc_name();
       s += " <- [xid " + std::to_string(xid) + "]";
       s += " -> [tracing ";
-      //s += std::to_string(hdr.tracing);
       s += "]";
       std::clog << xdr_to_string(*r, s.c_str());
     }

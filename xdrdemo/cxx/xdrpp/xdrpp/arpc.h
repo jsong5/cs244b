@@ -52,7 +52,6 @@ public:
     hdr.body.cbody().vers = P::interface_type::version;
     hdr.body.cbody().proc = P::proc;
 
-    std::clog << "[arpc invoke] hdr: " << hdr << std::endl;
     if (xdr_trace_client) {
       std::string s = "CALL ";
       s += P::proc_name();
@@ -104,15 +103,15 @@ public:
 template<typename T> using arpc_client =
   typename T::template _xdr_client<asynchronous_client_base>;
 
-class asynchronous_client_base1 {
+class asynchronous_client_base_tier {
   rpc_sock &s_;
   xdr::xstring<64U> connect_port_;
   std::string node_name;
 
 public:
-  asynchronous_client_base1(rpc_sock &s, xdr::xstring<64U> connect_port, std::string id) : s_(s),connect_port_(connect_port), node_name(id) {}
-  asynchronous_client_base1(rpc_sock &s, std::string id) : s_(s),connect_port_(DEFAULT_PORT), node_name(id) {}
-  asynchronous_client_base1(asynchronous_client_base1 &c) : s_(c.s_),connect_port_(c.connect_port_), node_name(c.node_name) {}
+  asynchronous_client_base_tier(rpc_sock &s, xdr::xstring<64U> connect_port, std::string id) : s_(s),connect_port_(connect_port), node_name(id) {}
+  asynchronous_client_base_tier(rpc_sock &s, std::string id) : s_(s),connect_port_(DEFAULT_PORT), node_name(id) {}
+  asynchronous_client_base_tier(asynchronous_client_base_tier &c) : s_(c.s_),connect_port_(c.connect_port_), node_name(c.node_name) {}
   
   xdr::xstring<64U> get_connectionport()
   {
@@ -179,14 +178,13 @@ public:
     });
   }
 
-  asynchronous_client_base1 *operator->() { return this; }
+  asynchronous_client_base_tier *operator->() { return this; }
 };
 
-template<typename T> using arpc_client1 =
-  typename T::template _xdr_client<asynchronous_client_base1>;
+template<typename T> using arpc_client_tier =
+  typename T::template _xdr_client<asynchronous_client_base_tier>;
 
 // And now for the server
-
 template<typename T> class reply_cb;
 
 using times = std::vector<double>;
@@ -197,7 +195,6 @@ class reply_cb_impl {
   template<typename T> friend class xdr::reply_cb;
   using cb_t = service_base::cb_t;
   uint32_t xid_;
-  //xdr::xstring<64U> connect_port_;
   cb_t cb_;
   const char *const proc_name_;
   std::string path_;
@@ -222,20 +219,10 @@ private:
   template<typename T> void send_reply(const T &t) {
     trace& trace = get_trace();
 
-    std::clog << "[send_reply] TRACE" << std::endl;
-    for (auto& kv : trace) {
-      times timing = kv.second;
-      std::clog << "timing Info for " << kv.first << ": " << std::endl;
-      for (double it : timing) {
-        std::clog << it << ", ";
-      }
-      std::clog << std::endl;
-    }
-
-    std::clog << "[send_reply] path: " << path_ << std::endl;
-
+    int sigfig = 10000;
+    // Quantized time tracker
     double total_time = CycleTimer::currentSeconds() - service_time;
-    total_time = 10000 * total_time;
+    total_time = sigfig * total_time;
     std::uint64_t packaged_time = std::ceil(total_time);
 
     if (xdr_trace_server) {
@@ -272,7 +259,6 @@ public:
       s_time_(CycleTimer::currentSeconds()) {}
 
   void operator()(const type &t, std::string server = __builtin_FUNCTION(), std::uint64_t time = 0) const {
-    std::cout << "[reply_cb operator()]" << std::endl;
     double e_time = CycleTimer::currentSeconds();
     std::string& path = impl_->get_path();
     path = server + "/" + path;

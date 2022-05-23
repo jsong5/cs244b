@@ -21,13 +21,13 @@ KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
   std::string& path = cb.get_path();
   auto trace = cb.get_trace();
 
-  double startTime = CycleTimer::currentSeconds();
+  // Get the value.
   vals_[*k] = *v;
   auto sleep_time = (id_ == "30429") ? 3 : 1;
+
+  // Simulate a sleep time.
   sleep(sleep_time);
-  double endTime = CycleTimer::currentSeconds();
-  std::clog << "[kv_put] Time: " << (endTime - startTime) << std::endl;
-  std::cout << "Server Side SET Key :" << *k << "Value : "<<vals_[*k]<< std::endl;
+
   cb(SUCCESS, node_identifier); // return value. Stands for callback I think
 }
 
@@ -35,22 +35,18 @@ void
 KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use 
 {
   std::string& path = cb.get_path();
-
-  double startTime = CycleTimer::currentSeconds();
   auto iter = vals_.find(*k);
+  sleep(1); //Simulate another sleep time. 
 
   if (iter == vals_.end()) {
     GetRes res(NOTFOUND); // initialize the proper type for the result. Also initializes the other type in the union
     cb(res, id_);
   }
   else {
-    std::cout << "Server Side GET Key :" << *k << "Value : "<<iter->second<< std::endl;
-    GetRes res(SUCCESS);	// (Redundant, 0 is default)
+    GetRes res(SUCCESS);
     res.value() = iter->second;
     cb(res, id_);
   }
-  double endTime = CycleTimer::currentSeconds();
-  std::clog << "[kv_get] Time: " << (endTime - startTime) << std::endl;
 }
 
 int
@@ -64,7 +60,6 @@ main(int argc, char **argv)
 
   auto portno = XDRDEMO_PORT + num;
   xdr::pollset ps;
-  std::cout << "async_server num:" << num << ", Port : "<< portno << std::endl;
   xdr::unique_sock sock = xdr::tcp_listen(std::to_string(portno).c_str());
   xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
