@@ -6,12 +6,15 @@
 
 uint32_t get_waiting = 0;
 uint32_t put_waiting = 0;
+uint64_t max_time = 0;
+std::string max_path = "/";
 std::vector<Value> get_values; // should be the same value across tiers, right?
 std::vector<xdr::xstring<>> paths;
+std::vector<std::uint64_t> times;
 
 // Call back from one server to other
 void
-get_cb(xdr::call_result<GetRes> res, std::string p)
+get_cb(xdr::call_result<GetRes> res, std::string p, std::uint64_t time)
 {
   //get_connectionport();
   if (res) {
@@ -30,11 +33,16 @@ get_cb(xdr::call_result<GetRes> res, std::string p)
 }
 
 void
-put_cb(xdr::call_result<Status> res, std::string p)
+put_cb(xdr::call_result<Status> res, std::string p, std::uint64_t time)
 {
     std::cout << "put_cb client path: " << p << std::endl;
+    if (time > max_time) {
+      max_time = time;
+      max_path = p;
+    }
     if (!p.empty()) {
       paths.push_back(p);
+      times.push_back(time);
     }
     put_waiting--;
 
@@ -47,61 +55,6 @@ put_cb(xdr::call_result<Status> res, std::string p)
     }
 }
 
-//KVTIERPROT_server
-//KVPROT1
-/*
-void
-KVPROT1_server::kvtier_null(xdr::reply_cb<void> cb)
-{
-  cb(); // return void 
-}
-
-void
-KVPROT1_server::kvtier_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
-		       xdr::reply_cb<Status> cb)//void(*cb)(std::string,xdr::reply_cb<Status>)) // We already make the pointers unique
-{
-    std::map<TierServerIdentification, Client_Storage*>::iterator it = NexttierConnections.begin();
-
-    while(it != NexttierConnections.end())
-    { 
-        Client_Storage* cs = it->second; //((xdr::arpc_client<KVTIERPROT>)(*(cs->client)))
-        xdr::arpc_client1<KVPROT1> *client = cs->client;
-        std::cout << "kvtier_put  client:" << cs->servertoconnectidentification<< std::endl; 
-        std::cout << "kvtier_put  key:" << *k << "value : "<<*v<< std::endl; 
-        //client->kvtier_put(Key(*k),Value(*v),get_cb);
-    }
-}
-
-void
-KVPROT1_server::kvtier_get(std::unique_ptr<Key> k,xdr::reply_cb<GetRes> cb)// void(*cb)(std::string,xdr::reply_cb<GetRes>)) // Use 
-{
-    std::map<TierServerIdentification, Client_Storage*>::iterator it = NexttierConnections.begin();
-
-    while(it != NexttierConnections.end())
-    {
-        Client_Storage* cs = it->second; //((xdr::arpc_client<KVTIERPROT>)(*(cs->client)))
-        xdr::arpc_client1<KVPROT1> *client = cs->client;
-        std::cout << "kvtier_get  client:" << cs->servertoconnectidentification<< std::endl; 
-        std::cout << "kvtier_get  key:" << *k << std::endl; 
-        //client->kvtier_get(Key(*k),put_cb);
-    }
-  
-  auto iter = vals_.find(*k);
-
-  if (iter == vals_.end()) {
-    GetRes res(NOTFOUND); // initialize the proper type for the result. Also initializes the other type in the union
-    cb(res);
-  }
-  else {
-      std::cout << "Sever Side GET Key :" << *k << "Value : "<<iter->second<< std::endl;
-    GetRes res(SUCCESS);	// (Redundant, 0 is default)
-    res.value() = iter->second;
-    cb(res);
-  }
-
-
-}
-*/
 void
 KVPROT1_master::kv_null(xdr::reply_cb<void> cb)
 {
@@ -135,7 +88,13 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
     }
     std::cout << std::endl;
 
-    auto critical_path = paths.empty() ? "/" : *paths.begin();
+    std::cout << "times: ";
+    for (auto t : times) {
+      std::cout << t << ", ";
+    }
+    std::cout << std::endl;
+
+    auto critical_path = max_path;
     std::cout << "[crit path] " << critical_path << std::endl;
 
     std::cout << "[cb get path] " << cb.get_path() << std::endl;
@@ -148,7 +107,7 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
     
     //Just a simple static value sending back.
 
-  cb(SUCCESS, node_identifier); // return value. Stands for callback I think
+  cb(SUCCESS, node_identifier, 0); // return value. Stands for callback I think
   paths = {};
 }
 
@@ -253,7 +212,7 @@ main(int argc, char **argv)
         cs->fd = xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT+*itn).c_str());
         cs->ps = new xdr::pollset();
         cs->rpcsoc = new xdr::rpc_sock(*(cs->ps), cs->fd.release());
-        cs->client = new xdr::arpc_client1<KVPROT1>(*cs->rpcsoc,cs->servertoconnectidentification);
+        cs->client = new xdr::arpc_client1<KVPROT1>(*cs->rpcsoc, cs->servertoconnectidentification, s.node_identifier);
 
         //Place the Object into the server connections map.
         s.kvtier_setconnections(cs);

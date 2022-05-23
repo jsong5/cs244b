@@ -13,6 +13,8 @@ namespace xdr {
 
 extern bool xdr_trace_client;
 
+
+
 msg_ptr read_message(sock_t s);
 void write_message(sock_t s, const msg_ptr &m);
 
