@@ -228,7 +228,7 @@ private:
     double acc = SIG_FIG;
     total_time = acc * total_time;
     std::uint64_t packaged_time = std::ceil(total_time);
-
+    
     if (xdr_trace_server) {
       std::string s = "REPLY ";
       s += proc_name_;
@@ -262,7 +262,7 @@ public:
     : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
       s_time_(CycleTimer::currentSeconds()) {}
 
-  void operator()(const type &t, std::string server = __builtin_FUNCTION(), std::uint64_t time = 0) const {
+void operator()(const type &t, std::string server = __builtin_FUNCTION(), std::uint64_t time = 0) const {
     double e_time = CycleTimer::currentSeconds();
     std::string& path = impl_->get_path();
     path = server + "/" + path;
@@ -301,6 +301,7 @@ public:
   template<typename P>
   void dispatch(Session *session, rpc_msg &hdr, xdr_get &g, cb_t reply) {
     std::clog << "[dispatch]" << std::endl;
+    // consider changing order, since this will act as root when request first made.
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
