@@ -5,6 +5,9 @@ const XDRDEMO_PORT = 30428;
 typedef string Key<64>;
 typedef string Value<512>;
 
+// Identification string of the TierServer
+typedef string TierServerID<64>;
+
 enum Status {
   SUCCESS = 0,			// Operatgion succeeded
   NOTFOUND = 1,			// Key was not found

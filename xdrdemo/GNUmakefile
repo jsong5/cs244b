@@ -1,5 +1,5 @@
 
-SUBDIRS = cxx gokv
+SUBDIRS = cxx
 
 all:
 	for dir in $(SUBDIRS); do \

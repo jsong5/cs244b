@@ -129,6 +129,7 @@ rpc_tcp_listener_common::rpc_tcp_listener_common(pollset &ps, unique_sock &&s,
 
 rpc_tcp_listener_common::~rpc_tcp_listener_common()
 {
+  
   ps_.fd_cb(listen_sock_.get(), pollset::Read);
   // XXX should clean up if use_rpcbind_.
 }

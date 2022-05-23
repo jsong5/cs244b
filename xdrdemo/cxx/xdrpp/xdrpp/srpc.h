@@ -13,6 +13,8 @@ namespace xdr {
 
 extern bool xdr_trace_client;
 
+
+
 msg_ptr read_message(sock_t s);
 void write_message(sock_t s, const msg_ptr &m);
 
@@ -47,8 +49,7 @@ public:
     std::unique_ptr<typename P::res_type>>::type
   invoke(const A &...a) {
     rpc_msg hdr;
-    double_t start_time = CycleTimer::currentSeconds();
-    std::cout << "[invoke] start_time: " << start_time << std::endl;
+    double start_time = CycleTimer::currentSeconds();
     prepare_call<P>(hdr);
     uint32_t xid = hdr.xid;
     
@@ -56,6 +57,8 @@ public:
       std::string s = "CALL ";
       s += P::proc_name();
       s += " -> [xid " + std::to_string(xid) + "]";
+      s += " -> [tracing ";
+      s += "]";
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
     write_message(s_, xdr_to_msg(hdr, a...));
@@ -68,10 +71,9 @@ public:
       throw xdr_runtime_error("synchronous_client: unexpected xid");
     
     pointer<typename P::res_wire_type> r;
-    std::cerr << "[invoke] reply body: " << hdr.body.rbody().areply() << std::endl;
-    std::cerr << "[invoke] path: " << hdr.body.rbody().areply().reply_data.success().path.data() << std::endl;
     archive(g, r.activate());
     g.done();
+
     if (xdr_trace_client) {
       std::string s = "REPLY ";
       s += P::proc_name();

@@ -20,9 +20,8 @@
 // Allows you to pretty-print XDR with <<
 using xdr::operator<<;
 
-
 void
-get_cb(xdr::call_result<GetRes> res)
+get_cb(xdr::call_result<GetRes> res, std::string p)
 {
   if (res) {
     if (res->stat() != SUCCESS) {
@@ -50,14 +49,14 @@ main(int argc, char **argv)
     xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT).c_str()); // basic socket for tcp
   xdr::pollset ps;
   xdr::rpc_sock s(ps, fd.release());
-  xdr::arpc_client<KVPROT1> client(s); // async rpc with application version feeing it the fd and ps we had. Inittializes client
+  xdr::arpc_client<KVPROT1> client(s, "client_original"); // async rpc with application version feeing it the fd and ps we had. Inittializes client
 
-  if (argc == 2) // this is putting
+  if (argc == 2) // For get
     client.kv_get(Key(argv[1]), get_cb); // Client thing
 
-  else if (argc == 3) // this is seting
+  else if (argc == 3) // For put
     client.kv_put(Key(argv[1]), Value(argv[2]),
-		  [](xdr::call_result<Status> res) {
+		  [](xdr::call_result<Status> res, std::string p) {
 		    if (!res) {
 		      std::cerr << "RPC error: " << res.message() << std::endl;
 		      exit(1);

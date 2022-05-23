@@ -93,7 +93,7 @@ struct accepted_reply {
   case SUCCESS:
     struct {
       double end_time;
-      opaque path<>;
+      string path<>;
       opaque results[0];
     } success;
     /*
@@ -121,7 +121,7 @@ union rejected_reply switch (reject_stat stat) {
      unsigned int high;
    } mismatch_info;
  case AUTH_ERROR:
-   auth_stat rj_why;
+  auth_stat rj_why;
 };
 
 /* Body of a reply to an RPC call: */
