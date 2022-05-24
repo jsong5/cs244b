@@ -21,7 +21,7 @@
 using xdr::operator<<;
 
 void
-get_cb(xdr::call_result<GetRes> res, std::string p)
+get_cb(xdr::call_result<GetRes> res)
 {
   if (res) {
     if (res->stat() != SUCCESS) {
@@ -56,7 +56,7 @@ main(int argc, char **argv)
 
   else if (argc == 3) // For put
     client.kv_put(Key(argv[1]), Value(argv[2]),
-		  [](xdr::call_result<Status> res, std::string p) {
+		  [](xdr::call_result<Status> res) {
 		    if (!res) {
 		      std::cerr << "RPC error: " << res.message() << std::endl;
 		      exit(1);
