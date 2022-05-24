@@ -6,6 +6,8 @@
 #define _XDRPP_ARPC_H_HEADER_INCLUDED_ 1
 #define DEFAULT_ASYNC_NODE_NAME "node"
 #define SIG_FIG 10000;
+#define DEFAULT_SERVER "DefaultServer"
+#define DEFAULT_PORT "DEFAULT_PORT"
 
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
@@ -15,7 +17,6 @@
 static double service_time;
 
 namespace xdr {
-std::string DEFAULT_PORT ("DEFAULT_PORT");
 //! A \c unique_ptr to a call result, or NULL if the call failed (in
 //! which case \c message returns an error message).
 template<typename T> struct call_result : std::unique_ptr<T> {
@@ -221,8 +222,7 @@ private:
     // Quantized time tracker
     double total_time = CycleTimer::currentSeconds() - service_time;
 
-    double acc = SIG_FIG;
-    total_time = acc * total_time;
+    total_time *= SIG_FIG;
     std::uint64_t packaged_time = std::ceil(total_time);
     
     if (xdr_trace_server) {
@@ -258,7 +258,7 @@ public:
     : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
       s_time_(CycleTimer::currentSeconds()) {}
 
-void operator()(const type &t, std::string server = __builtin_FUNCTION(), std::uint64_t time = 0) const {
+void operator()(const type &t, std::string server = DEFAULT_SERVER) const {
     double e_time = CycleTimer::currentSeconds();
     std::string& path = impl_->get_path();
     path = server + "/" + path;

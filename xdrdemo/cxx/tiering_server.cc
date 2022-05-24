@@ -70,23 +70,23 @@ void
 KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
-    // Make containers for all the outbound requests and their sockets
-    std::map<TierServerID, Client_Storage*>::iterator it = NextTierConnections.begin();
-    put_waiting = NextTierConnections.size();
-    while(it != NextTierConnections.end())
-    {
-        Client_Storage* cs = it->second;
-        xdr::arpc_client_tier<KVPROT1> *client = cs->client;
-        client->kv_put(Key(*k),Value(*v),put_cb);
-        it++;
-    }
+  // Make containers for all the outbound requests and their sockets
+  std::map<TierServerID, Client_Storage*>::iterator it = NextTierConnections.begin();
+  put_waiting = NextTierConnections.size();
+  while(it != NextTierConnections.end())
+  {
+      Client_Storage* cs = it->second;
+      xdr::arpc_client_tier<KVPROT1> *client = cs->client;
+      client->kv_put(Key(*k),Value(*v),put_cb);
+      it++;
+  }
 
-    // We block on the longest request (still can process requests in parallel).
-    while(put_waiting > 0){}
+  // We block on the longest request (still can process requests in parallel).
+  while(put_waiting > 0){}
 
-    // Retrieve critical path after handling.
-    cb.get_path() = critical_path;
-  cb(SUCCESS, node_identifier, 0); // return value. Stands for callback I think
+  // Retrieve critical path after handling.
+  cb.get_path() = critical_path;
+  cb(SUCCESS, node_identifier); // return value. Stands for callback I think
   // Clear paths tracker
   paths = {};
 }
@@ -110,7 +110,7 @@ KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 
     GetRes res(SUCCESS);	// (Redundant, 0 is default)
     res.value() = last_get;
-    cb(res);
+    cb(res, node_identifier);
     paths = {};
 }
 
