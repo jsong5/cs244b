@@ -28,7 +28,7 @@ KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
   // Simulate a sleep time.
   sleep(sleep_time);
 
-  cb(SUCCESS, node_identifier); // return value. Stands for callback I think
+  cb(SUCCESS, node_name_); // return value. Stands for callback I think
 }
 
 void
@@ -40,12 +40,12 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 
   if (iter == vals_.end()) {
     GetRes res(NOTFOUND); // initialize the proper type for the result. Also initializes the other type in the union
-    cb(res, id_);
+    cb(res, node_name_);
   }
   else {
     GetRes res(SUCCESS);
     res.value() = iter->second;
-    cb(res, id_);
+    cb(res, node_name_);
   }
 }
 
@@ -63,7 +63,7 @@ main(int argc, char **argv)
   xdr::unique_sock sock = xdr::tcp_listen(std::to_string(portno).c_str());
   xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
 
-  KVPROT1_server s(portno, "server" + std::to_string(num));
+  KVPROT1_server s(portno);
   listen.register_service(s);
 
   ps.run();
