@@ -4,7 +4,7 @@
 
 #ifndef _XDRPP_ARPC_H_HEADER_INCLUDED_
 #define _XDRPP_ARPC_H_HEADER_INCLUDED_ 1
-#define _DEFAULT_ASYNC_NODE_NAME "node"
+#define DEFAULT_ASYNC_NODE_NAME "node"
 #define SIG_FIG 10000;
 
 #include <xdrpp/exception.h>
@@ -36,18 +36,18 @@ template<> struct call_result<void> {
   xdr_void &operator*() { static xdr_void v; return v; }
 };
 
-class asynchronous_client_base {
+class async_client_base {
+protected:
   rpc_sock &s_;
   std::string node_name;
-
 public:
-  asynchronous_client_base(rpc_sock &s) : s_(s), node_name(_DEFAULT_ASYNC_NODE_NAME) {}
-  asynchronous_client_base(rpc_sock &s, std::string identifier) : s_(s), node_name(identifier) {}
-  asynchronous_client_base(asynchronous_client_base &c) : s_(c.s_), node_name(c.node_name){}
+  async_client_base(rpc_sock &s) : s_(s), node_name(DEFAULT_ASYNC_NODE_NAME) {}
+  async_client_base(rpc_sock &s, std::string identifier) : s_(s), node_name(identifier) {}
+  async_client_base(async_client_base &c) : s_(c.s_), node_name(c.node_name){}
 
   template<typename P, typename...A>
   void invoke(const A &...a,
-	      std::function<void(call_result<typename P::res_type>, std::string)> cb) {
+	      std::function<void(call_result<typename P::res_type>)> cb) {
     rpc_msg hdr { s_.get_xid(),CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
@@ -65,7 +65,7 @@ public:
 
     s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
       if (!m)
-          return cb(rpc_call_stat::NETWORK_ERROR, "");
+          return cb(rpc_call_stat::NETWORK_ERROR);
         
       try {
         xdr_get g(m);
@@ -91,34 +91,30 @@ public:
             std::clog << s;
           }
         }
-        cb(std::move(res), "");
+        cb(std::move(res));
       }
       catch (const xdr_runtime_error &e) {
-        cb(rpc_call_stat::GARBAGE_RES, "");
+        cb(rpc_call_stat::GARBAGE_RES);
       }
     });
   }
 
-  asynchronous_client_base *operator->() { return this; }
+  async_client_base *operator->() { return this; }
 };
 
 template<typename T> using arpc_client =
-  typename T::template _xdr_client<asynchronous_client_base>;
+  typename T::template _xdr_client<async_client_base>;
 
-class asynchronous_client_base_tier {
-  rpc_sock &s_;
+class async_tier : public async_client_base {
+private:
   xdr::xstring<64U> connect_port_;
-  std::string node_name;
-
 public:
-  asynchronous_client_base_tier(rpc_sock &s, xdr::xstring<64U> connect_port, std::string id) : s_(s),connect_port_(connect_port), node_name(id) {}
-  asynchronous_client_base_tier(rpc_sock &s, std::string id) : s_(s),connect_port_(DEFAULT_PORT), node_name(id) {}
-  asynchronous_client_base_tier(asynchronous_client_base_tier &c) : s_(c.s_),connect_port_(c.connect_port_), node_name(c.node_name) {}
-  
-  xdr::xstring<64U> get_connectionport()
-  {
-    return connect_port_;
-  }
+  async_tier(rpc_sock &s, xdr::xstring<64U> connect_port, std::string id)
+    : async_client_base(s, id), connect_port_(connect_port) {}
+  async_tier(rpc_sock &s, std::string id)
+    : async_client_base(s, id), connect_port_(DEFAULT_PORT) {}
+  async_tier(async_tier &c)
+    : async_client_base(c), connect_port_(c.connect_port_) {}
 
   template<typename P, typename...A>
   void invoke(const A &...a,
@@ -139,19 +135,20 @@ public:
     }
 
     s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
-      std::string scc = "XXXXX";
       if (!m)
-      {
         return cb(rpc_call_stat::NETWORK_ERROR, "", 0);
-      }
       try {
         xdr_get g(m);
         rpc_msg hdr;
         archive(g, hdr);
         call_result<typename P::res_type> res(hdr);
-        auto path = hdr.body.rbody().areply().reply_data.success().path;
-        std::uint64_t path_time = hdr.body.rbody().areply().reply_data.success().end_time;
-
+        auto path = hdr.body.mtype() == REPLY &&
+                    hdr.body.rbody().stat() == MSG_ACCEPTED ?
+                    hdr.body.rbody().areply().reply_data.success().path :
+                    "";
+        auto path_time = !path.empty() ?
+                         hdr.body.rbody().areply().reply_data.success().end_time :
+                         0;
         if (res)
         {
           archive(g, *res);
@@ -171,7 +168,6 @@ public:
             std::clog << s;
           }
         }
-        
         cb(std::move(res), path, path_time);
       }
       catch (const xdr_runtime_error &e) {
@@ -180,11 +176,11 @@ public:
     });
   }
 
-  asynchronous_client_base_tier *operator->() { return this; }
+  async_tier *operator->() { return this; }
 };
 
 template<typename T> using arpc_client_tier =
-  typename T::template _xdr_client<asynchronous_client_base_tier>;
+  typename T::template _xdr_client<async_tier>;
 
 // And now for the server
 template<typename T> class reply_cb;
