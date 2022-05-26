@@ -6,30 +6,13 @@
 
 uint32_t get_waiting = 0;
 uint32_t put_waiting = 0;
-uint64_t max_time = 0;
 Value last_get;
-std::string critical_path = "/";
-std::vector<xdr::xstring<>> paths;
-std::vector<std::uint64_t> times;
-
-
-void process_timing(std::string p, std::uint64_t time) {
-  if (time > max_time) {
-      max_time = time;
-      critical_path = p;
-  }
-  if (!p.empty()) {
-    paths.push_back(p);
-    times.push_back(time);
-  }
-}
 
 // Call back from one server to other
 void
 get_cb(xdr::call_result<GetRes> res, std::string p, std::uint64_t time)
 {
   // Handle tracing
-  process_timing(p, time);
   get_waiting--;
 
   // Handle reply
@@ -47,7 +30,6 @@ void
 put_cb(xdr::call_result<Status> res, std::string p, std::uint64_t time)
 {
   // Handle tracing
-  process_timing(p, time);
   put_waiting--;
   
   // Handle reply
@@ -85,10 +67,8 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
   while(put_waiting > 0){}
 
   // Retrieve critical path after handling.
-  cb.get_path() = critical_path;
   cb(SUCCESS, node_name_); // return value. Stands for callback I think
   // Clear paths tracker
-  paths = {};
 }
 
 void
@@ -111,7 +91,6 @@ KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
     GetRes res(SUCCESS);	// (Redundant, 0 is default)
     res.value() = last_get;
     cb(res, node_name_);
-    paths = {};
 }
 
 // function used for tier on separate thread.

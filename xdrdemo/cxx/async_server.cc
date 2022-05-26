@@ -18,23 +18,23 @@ void
 KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
-  std::string& path = cb.get_path();
+  
+
   auto trace = cb.get_trace();
 
   // Get the value.
   vals_[*k] = *v;
-  auto sleep_time = (id_ == "30429") ? 3 : 1;
+
+  auto sleep_time = (id_ == "30450") ? 3 : 1;
 
   // Simulate a sleep time.
   sleep(sleep_time);
-
   cb(SUCCESS, node_name_); // return value. Stands for callback I think
 }
 
 void
 KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use 
 {
-  std::string& path = cb.get_path();
   auto iter = vals_.find(*k);
   sleep(1); //Simulate another sleep time. 
 
@@ -56,7 +56,7 @@ main(int argc, char **argv)
         std::cerr << "usage: " << argv[0] << " [number]" << std::endl;
         exit(1);
   }
-  std:uint32_t num= atoi(argv[1]);
+  std:uint32_t num = atoi(argv[1]);
 
   auto portno = XDRDEMO_PORT + num;
   xdr::pollset ps;
