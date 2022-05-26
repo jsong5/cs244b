@@ -9,6 +9,7 @@
 namespace xdr {
 
 bool xdr_trace_client = std::getenv("XDR_TRACE_CLIENT");
+std::string xdr_node_name = std::getenv("XDR_NODE_NAME");
 
 static ssize_t
 fullread(sock_t s, void *buf, size_t n)
