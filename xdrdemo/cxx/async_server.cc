@@ -29,7 +29,7 @@ KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 
   // Simulate a sleep time.
   sleep(sleep_time);
-  cb(SUCCESS, node_name_); // return value. Stands for callback I think
+  cb(SUCCESS); // return value. Stands for callback I think
 }
 
 void
@@ -40,12 +40,12 @@ KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 
   if (iter == vals_.end()) {
     GetRes res(NOTFOUND); // initialize the proper type for the result. Also initializes the other type in the union
-    cb(res, node_name_);
+    cb(res);
   }
   else {
     GetRes res(SUCCESS);
     res.value() = iter->second;
-    cb(res, node_name_);
+    cb(res);
   }
 }
 
