@@ -5,9 +5,11 @@
 #ifndef _XDRPP_ARPC_H_HEADER_INCLUDED_
 #define _XDRPP_ARPC_H_HEADER_INCLUDED_ 1
 #define DEFAULT_ASYNC_NODE_NAME "node"
-#define SIG_FIG 10000;
+#define SIG_FIG 10000
 #define DEFAULT_SERVER "DefaultServer"
 #define DEFAULT_PORT "DEFAULT_PORT"
+
+#define DISTRRIBUTED_TRACING 0 // 0 for Critical path tracing, 1 for Distributed profiling
 
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
@@ -91,6 +93,16 @@ public:
           std::string s = "REPLY ";
           s += P::proc_name();
           s += " <- [xid " + std::to_string(hdr.xid) + "]";
+
+          auto path = hdr.body.mtype() == REPLY &&
+                      hdr.body.rbody().stat() == MSG_ACCEPTED ?
+                      hdr.body.rbody().areply().reply_data.success().path :
+                      "";
+
+          s += " [trace]: ";
+          s += path;
+          s += "\n";
+
           if (res)
             std::clog << xdr_to_string(*res, s.c_str());
           else {
@@ -294,6 +306,8 @@ void operator()(const type &t, std::string server = DEFAULT_SERVER) const {
     path_map_mutex.lock();
     time_in_sec = e_time - xid_time_map[xid];
     if (xid_string_map.count(xid) != 0) {
+      #if DISTRRIBUTED_TRACING == 0 
+      //Branch for CPT.
       for (int i = 0; i < xid_string_map[xid].size(); i++) {
         std::uint64_t curr_time = xid_string_map[xid][i].second;
         std::string curr_path = xid_string_map[xid][i].first;
@@ -302,6 +316,13 @@ void operator()(const type &t, std::string server = DEFAULT_SERVER) const {
           max_path = curr_path;
         }
       }
+      #else 
+      // Branch for distributed tracing
+      for (int i = 0; i < xid_string_map[xid].size(); i++) {
+        std::string curr_path = xid_string_map[xid][i].first;
+        max_path += (curr_path + "; ");
+      }
+      #endif
     }
     path_map_mutex.unlock();
     
