@@ -347,7 +347,6 @@ public:
 template<typename T, typename Session, typename Interface>
 class arpc_service : public service_base {
   T &server_;
-  std::string node_name_;
 
 public:
   void process(void *session, rpc_msg &hdr, xdr_get &g, cb_t reply) override {
@@ -383,12 +382,12 @@ public:
 
     dispatch_with_session<P>(server_, session, std::move(arg),
 			     reply_cb<typename P::res_type>{
-			       hdr.xid, std::move(reply), P::proc_name(), node_name_});
+			       hdr.xid, std::move(reply), P::proc_name(), server_.node_name_});
   }
 
   arpc_service(T &server)
     : service_base(Interface::program, Interface::version),
-      server_(server), node_name_(server.node_name_) {}
+      server_(server) {}
 };
 
 class arpc_server : public rpc_server_base {
