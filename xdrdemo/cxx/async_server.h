@@ -10,11 +10,12 @@
 #include "kvprot.hh"
 
 class KVPROT1_server {
+private:
   TierServerID id_;
   std::map<Key, Value> vals_;
-  std::string node_name_;
 
 public:
+  std::string node_name_;
   using rpc_interface_type = KVPROT1;
 
   KVPROT1_server() : id_(DEFAULT_PORT), node_name_(DEFAULT_SERVER) {}

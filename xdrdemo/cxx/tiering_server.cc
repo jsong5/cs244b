@@ -67,7 +67,7 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
   while(put_waiting > 0){}
 
   // Retrieve critical path after handling.
-  cb(SUCCESS, node_name_); // return value. Stands for callback I think
+  cb(SUCCESS); // return value. Stands for callback I think
   // Clear paths tracker
 }
 
@@ -90,7 +90,7 @@ KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 
     GetRes res(SUCCESS);	// (Redundant, 0 is default)
     res.value() = last_get;
-    cb(res, node_name_);
+    cb(res);
 }
 
 // function used for tier on separate thread.

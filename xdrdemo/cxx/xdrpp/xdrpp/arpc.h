@@ -8,8 +8,7 @@
 #define SIG_FIG 10000
 #define DEFAULT_SERVER "DefaultServer"
 #define DEFAULT_PORT "DEFAULT_PORT"
-
-#define DISTRRIBUTED_TRACING 0 // 0 for Critical path tracing, 1 for Distributed profiling
+#define DISTRIBUTED_TRACING 0 // 0 for Critical path tracing, 1 for Distributed profiling
 
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
@@ -287,13 +286,14 @@ public:
   using type = T;
   std::shared_ptr<impl_t> impl_;
   double s_time_;
+  std::string node_name_;
 
   reply_cb() {}
-  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name)
+  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name, std::string node_name)
     : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
-      s_time_(CycleTimer::currentSeconds()) {}
+      s_time_(CycleTimer::currentSeconds()), node_name_(node_name) {}
 
-void operator()(const type &t, std::string server = DEFAULT_SERVER) const {
+void operator()(const type &t) const {
     double e_time = CycleTimer::currentSeconds();
     uint64_t xid = impl_->get_xid();
 
@@ -306,8 +306,13 @@ void operator()(const type &t, std::string server = DEFAULT_SERVER) const {
     path_map_mutex.lock();
     time_in_sec = e_time - xid_time_map[xid];
     if (xid_string_map.count(xid) != 0) {
-      #if DISTRRIBUTED_TRACING == 0 
-      //Branch for CPT.
+      #if DISTRIBUTED_TRACING
+      // Branch for distributed tracing
+      for (int i = 0; i < xid_string_map[xid].size(); i++) {
+        std::string curr_path = xid_string_map[xid][i].first;
+        max_path += (curr_path + "; ");
+      }
+      #else      //Branch for CPT.
       for (int i = 0; i < xid_string_map[xid].size(); i++) {
         std::uint64_t curr_time = xid_string_map[xid][i].second;
         std::string curr_path = xid_string_map[xid][i].first;
@@ -316,18 +321,12 @@ void operator()(const type &t, std::string server = DEFAULT_SERVER) const {
           max_path = curr_path;
         }
       }
-      #else 
-      // Branch for distributed tracing
-      for (int i = 0; i < xid_string_map[xid].size(); i++) {
-        std::string curr_path = xid_string_map[xid][i].first;
-        max_path += (curr_path + "; ");
-      }
       #endif
     }
     path_map_mutex.unlock();
     
     // Formatting the final string
-    std::string path = server + "_[" + std::to_string(time_in_sec) + "s]"+ "/" + max_path;
+    std::string path = node_name_ + "_[" + std::to_string(time_in_sec) + "s]"+ "/" + max_path;
     std::pair<std::string, double> curr_trace = {path, time_in_sec};
     impl_->set_trace(curr_trace);
     impl_->send_reply(t);
@@ -348,6 +347,7 @@ public:
 template<typename T, typename Session, typename Interface>
 class arpc_service : public service_base {
   T &server_;
+  std::string node_name_;
 
 public:
   void process(void *session, rpc_msg &hdr, xdr_get &g, cb_t reply) override {
@@ -383,12 +383,12 @@ public:
 
     dispatch_with_session<P>(server_, session, std::move(arg),
 			     reply_cb<typename P::res_type>{
-			       hdr.xid, std::move(reply), P::proc_name()});
+			       hdr.xid, std::move(reply), P::proc_name(), node_name_});
   }
 
   arpc_service(T &server)
     : service_base(Interface::program, Interface::version),
-      server_(server) {}
+      server_(server), node_name_(server.node_name_) {}
 };
 
 class arpc_server : public rpc_server_base {
