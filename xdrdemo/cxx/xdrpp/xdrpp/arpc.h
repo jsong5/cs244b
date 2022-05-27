@@ -90,19 +90,19 @@ public:
         g.done();
 
         if (xdr_trace_client) {
-          std::string s = "REPLY ";
-          s += P::proc_name();
-          s += " <- [xid " + std::to_string(hdr.xid) + "]";
-
+          std::string s = "";
           auto path = hdr.body.mtype() == REPLY &&
-                      hdr.body.rbody().stat() == MSG_ACCEPTED ?
-                      hdr.body.rbody().areply().reply_data.success().path :
-                      "";
+            hdr.body.rbody().stat() == MSG_ACCEPTED ?
+            hdr.body.rbody().areply().reply_data.success().path :
+            "";
 
-          s += " [trace]: ";
+          s += "[trace]: ";
           s += path;
           s += "\n";
 
+          s += "REPLY ";
+          s += P::proc_name();
+          s += " <- [xid " + std::to_string(hdr.xid) + "]";
           if (res)
             std::clog << xdr_to_string(*res, s.c_str());
           else {
