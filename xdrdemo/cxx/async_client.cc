@@ -21,7 +21,7 @@
 using xdr::operator<<;
 
 void
-get_cb(xdr::call_result<GetRes> res, std::string p)
+get_cb(xdr::call_result<GetRes> res)
 {
   if (res) {
     if (res->stat() != SUCCESS) {
@@ -46,17 +46,17 @@ main(int argc, char **argv)
   }
 
   xdr::unique_sock fd =
-    xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT).c_str()); // basic socket for tcp
+    xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT).c_str());
   xdr::pollset ps;
   xdr::rpc_sock s(ps, fd.release());
-  xdr::arpc_client<KVPROT1> client(s, "client_original"); // async rpc with application version feeing it the fd and ps we had. Inittializes client
+  xdr::arpc_client<KVPROT1> client(s, "client_original");
 
-  if (argc == 2) // For get
-    client.kv_get(Key(argv[1]), get_cb); // Client thing
+  if (argc == 2)
+    client.kv_get(Key(argv[1]), get_cb);
 
-  else if (argc == 3) // For put
+  else if (argc == 3)
     client.kv_put(Key(argv[1]), Value(argv[2]),
-		  [](xdr::call_result<Status> res, std::string p) {
+		  [](xdr::call_result<Status> res) {
 		    if (!res) {
 		      std::cerr << "RPC error: " << res.message() << std::endl;
 		      exit(1);
