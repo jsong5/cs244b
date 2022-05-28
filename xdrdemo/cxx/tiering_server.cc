@@ -53,39 +53,29 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
   // Make containers for all the outbound requests and their sockets
-  std::map<TierServerID, Client_Storage*>::iterator it = next_tier_connections_.begin();
   put_waiting = next_tier_connections_.size();
-  while(it != next_tier_connections_.end())
+  for (auto it = next_tier_connections_.begin(); it != next_tier_connections_.end(); it++)
   {
-      Client_Storage* cs = it->second;
-      xdr::arpc_client_tier<KVPROT1> *client = cs->client;
-      client->kv_put(Key(*k),Value(*v),put_cb);
-      it++;
+      it->second->client->kv_put(Key(*k),Value(*v),put_cb);
   }
 
   // We block on the longest request (still can process requests in parallel).
   while(put_waiting > 0){}
 
-  // Retrieve critical path after handling.
-  cb(SUCCESS); // return value. Stands for callback I think
-  // Clear paths tracker
+  cb(SUCCESS);
 }
 
 void
 KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
 {
   // Make containers for all the outbound requests and their sockets
-    std::map<TierServerID, Client_Storage*>::iterator it = next_tier_connections_.begin();
     get_waiting = next_tier_connections_.size();
-    while(it != next_tier_connections_.end())
+    for (auto it = next_tier_connections_.begin(); it != next_tier_connections_.end(); it++)
     {
-        Client_Storage* cs = it->second;
-        xdr::arpc_client_tier<KVPROT1> *client = cs->client;
-        client->kv_get(Key(*k),get_cb);
-        it++;
+        it->second->client->kv_get(Key(*k),get_cb);
     }
-    
-    // Block on longest rrequest
+
+    // Block on longest request
     while(get_waiting > 0){}
 
     GetRes res(SUCCESS);	// (Redundant, 0 is default)
