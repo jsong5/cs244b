@@ -24,7 +24,6 @@ static std::unordered_map<uint32_t, double> xid_time_map;
 // A mutex to safegard against multiple client cb's
 static std::mutex path_map_mutex;
 
-
 namespace xdr {
 //! A \c unique_ptr to a call result, or NULL if the call failed (in
 //! which case \c message returns an error message).
@@ -175,8 +174,9 @@ public:
         if (path != "") {
           path_map_mutex.lock();
           if (xid_string_map.count(xid) == 0) {
-            std::vector<std::pair<std::string, std::uint64_t>> outer({});
-            outer.push_back({path, path_time});
+            std::vector<std::pair<std::string, std::uint64_t>> outer({
+              {path, path_time}
+            });
             xid_string_map.insert({xid, outer});
           } else {
             xid_string_map[xid].push_back({path, path_time});
@@ -360,8 +360,6 @@ public:
 
   template<typename P>
   void dispatch(Session *session, rpc_msg &hdr, xdr_get &g, cb_t reply) {
-    std::clog << "[dispatch]" << std::endl;
-    // consider changing order, since this will act as root when request first made.
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
@@ -373,7 +371,7 @@ public:
       xid_time_map.insert({hdr.xid, time});
       path_map_mutex.unlock();
 
-      std::string s = "CALL START";
+      std::string s = "CALL START ";
       s += P::proc_name();
       s += " <- [xid " + std::to_string(hdr.xid) + "]";
       std::clog << xdr_to_string(arg, s.c_str());

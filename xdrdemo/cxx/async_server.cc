@@ -18,26 +18,19 @@ void
 KVPROT1_server::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
 		       xdr::reply_cb<Status> cb) // We already make the pointers unique
 {
-  
-
-  auto trace = cb.get_trace();
-
-  // Get the value.
-  vals_[*k] = *v;
-
   auto sleep_time = (id_ == "30450") ? 3 : 1;
-
   // Simulate a sleep time.
   sleep(sleep_time);
+
+  vals_[*k] = *v;
   cb(SUCCESS); // return value. Stands for callback I think
 }
 
 void
 KVPROT1_server::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use 
 {
+  sleep(1); //Simulate another sleep time.
   auto iter = vals_.find(*k);
-  sleep(1); //Simulate another sleep time. 
-
   if (iter == vals_.end()) {
     GetRes res(NOTFOUND); // initialize the proper type for the result. Also initializes the other type in the union
     cb(res);
@@ -61,7 +54,7 @@ main(int argc, char **argv)
   auto portno = XDRDEMO_PORT + num;
   xdr::pollset ps;
   xdr::unique_sock sock = xdr::tcp_listen(std::to_string(portno).c_str());
-  xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {}); // async rpc lister
+  xdr::arpc_tcp_listener<> listen(ps, std::move(sock), false, {});
 
   KVPROT1_server s(portno);
   listen.register_service(s);
