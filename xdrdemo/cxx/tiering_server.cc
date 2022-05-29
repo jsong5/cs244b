@@ -10,7 +10,7 @@ Value last_get;
 
 // Call back from one server to other
 void
-get_cb(xdr::call_result<GetRes> res, std::string p, std::uint64_t time)
+get_cb(xdr::call_result<GetRes> res)
 {
   // Handle tracing
   get_waiting--;
@@ -27,7 +27,7 @@ get_cb(xdr::call_result<GetRes> res, std::string p, std::uint64_t time)
 }
 
 void
-put_cb(xdr::call_result<Status> res, std::string p, std::uint64_t time)
+put_cb(xdr::call_result<Status> res)
 {
   // Handle tracing
   put_waiting--;
@@ -81,7 +81,7 @@ KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
     {
         Client_Storage* cs = it->second;
         xdr::arpc_client_tier<KVPROT1> *client = cs->client;
-        client->kv_get(Key(*k),get_cb);
+        client->kv_get(Key(*k), get_cb);
         it++;
     }
     

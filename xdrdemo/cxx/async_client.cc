@@ -15,10 +15,13 @@
 #include <iostream>
 #include <string.h>
 #include <xdrpp/arpc.h>
+#include "CycleTimer.h"
 #include "kvprot.hh"
 
 // Allows you to pretty-print XDR with <<
 using xdr::operator<<;
+
+double start_time;
 
 void
 get_cb(xdr::call_result<GetRes> res)
@@ -55,8 +58,14 @@ main(int argc, char **argv)
     client.kv_get(Key(argv[1]), get_cb); // Client thing
 
   else if (argc == 3) // For put
+    
+    start_time = CycleTimer::currentSeconds();
     client.kv_put(Key(argv[1]), Value(argv[2]),
 		  [](xdr::call_result<Status> res) {
+
+        double end_time = CycleTimer::currentSeconds();
+        std::cerr << "----------end to end time kv_put: " << end_time - start_time << std::endl;
+
 		    if (!res) {
 		      std::cerr << "RPC error: " << res.message() << std::endl;
 		      exit(1);

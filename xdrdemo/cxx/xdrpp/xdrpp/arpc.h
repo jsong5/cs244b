@@ -138,7 +138,7 @@ public:
 
   template<typename P, typename...A>
   void invoke(const A &...a,
-	      std::function<void(call_result<typename P::res_type>, std::string, std::uint64_t)> cb) {
+	      std::function<void(call_result<typename P::res_type>)> cb) {
     rpc_msg hdr { s_.get_xid(), CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
@@ -156,7 +156,7 @@ public:
 
     s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
       if (!m)
-        return cb(rpc_call_stat::NETWORK_ERROR, "", 0);
+        return cb(rpc_call_stat::NETWORK_ERROR);
       try {
         xdr_get g(m);
         rpc_msg hdr;
@@ -203,10 +203,10 @@ public:
             std::clog << s;
           }
         }
-        cb(std::move(res), path, path_time);
+        cb(std::move(res));
       }
       catch (const xdr_runtime_error &e) {
-        cb(rpc_call_stat::GARBAGE_RES, "", 0);
+        cb(rpc_call_stat::GARBAGE_RES);
       }
     });
   }
