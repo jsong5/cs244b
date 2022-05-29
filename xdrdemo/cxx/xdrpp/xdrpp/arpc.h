@@ -56,7 +56,7 @@ public:
 
   template<typename P, typename...A>
   void invoke(const A &...a,
-	      std::function<void(call_result<typename P::res_type>)> cb) {
+	      std::function<void(call_result<typename P::res_type>)> cb, bool trace = false) {
     rpc_msg hdr { s_.get_xid(),CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
@@ -72,7 +72,7 @@ public:
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
 
-    s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
+    s_.send_call(xdr_to_msg(hdr, a...), [cb, trace](msg_ptr m) {
       if (!m)
           return cb(rpc_call_stat::NETWORK_ERROR);
         
@@ -137,7 +137,7 @@ public:
 
   template<typename P, typename...A>
   void invoke(const A &...a,
-	      std::function<void(call_result<typename P::res_type>, std::string, std::uint64_t)> cb) {
+	      std::function<void(call_result<typename P::res_type>)> cb, bool trace = false) {
     rpc_msg hdr { s_.get_xid(), CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
@@ -153,9 +153,9 @@ public:
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
 
-    s_.send_call(xdr_to_msg(hdr, a...), [cb](msg_ptr m) {
+    s_.send_call(xdr_to_msg(hdr, a...), [cb, trace](msg_ptr m) {
       if (!m)
-        return cb(rpc_call_stat::NETWORK_ERROR, "", 0);
+        return cb(rpc_call_stat::NETWORK_ERROR);
       try {
         xdr_get g(m);
         rpc_msg hdr;
@@ -169,9 +169,8 @@ public:
         auto path_time = !path.empty() ?
                          hdr.body.rbody().areply().reply_data.success().end_time :
                          0;
-
-        // Keep a mapping from xid to paths
-        if (path != "") {
+        if (trace) {
+          // Keep a mapping from xid to paths
           path_map_mutex.lock();
           if (xid_string_map.count(xid) == 0) {
             std::vector<std::pair<std::string, std::uint64_t>> outer({
@@ -183,6 +182,7 @@ public:
           }
           path_map_mutex.unlock();
         }
+        
 
         if (res)
         {
@@ -203,10 +203,10 @@ public:
             std::clog << s;
           }
         }
-        cb(std::move(res), path, path_time);
+        cb(std::move(res));
       }
       catch (const xdr_runtime_error &e) {
-        cb(rpc_call_stat::GARBAGE_RES, "", 0);
+        cb(rpc_call_stat::GARBAGE_RES);
       }
     });
   }
@@ -300,6 +300,7 @@ void operator()(const type &t) const {
     // Containers to pass to send_reply
     std::uint64_t max_time = 0;
     std::string max_path = "";
+    std::string path = "";
     double time_in_sec = 0;
 
     // Find the critical path
@@ -322,11 +323,12 @@ void operator()(const type &t) const {
         }
       }
       #endif
+      
     }
     path_map_mutex.unlock();
     
     // Formatting the final string
-    std::string path = node_name_ + "_[" + std::to_string(time_in_sec) + "s]"+ "/" + max_path;
+    path = node_name_ + "_[" + std::to_string(time_in_sec) + "s]"+ "/" + max_path;
     std::pair<std::string, double> curr_trace = {path, time_in_sec};
     impl_->set_trace(curr_trace);
     impl_->send_reply(t);

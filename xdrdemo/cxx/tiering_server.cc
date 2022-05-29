@@ -10,7 +10,7 @@ Value last_get;
 
 // Call back from one server to other
 void
-get_cb(xdr::call_result<GetRes> res, std::string p, std::uint64_t time)
+get_cb(xdr::call_result<GetRes> res)
 {
   // Handle tracing
   get_waiting--;
@@ -27,7 +27,7 @@ get_cb(xdr::call_result<GetRes> res, std::string p, std::uint64_t time)
 }
 
 void
-put_cb(xdr::call_result<Status> res, std::string p, std::uint64_t time)
+put_cb(xdr::call_result<Status> res)
 {
   // Handle tracing
   put_waiting--;
@@ -56,7 +56,7 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
   put_waiting = next_tier_connections_.size();
   for (auto it = next_tier_connections_.begin(); it != next_tier_connections_.end(); it++)
   {
-      it->second->client->kv_put(Key(*k),Value(*v),put_cb);
+      it->second->client->kv_put(Key(*k),Value(*v), put_cb, true);
   }
 
   // We block on the longest request (still can process requests in parallel).
