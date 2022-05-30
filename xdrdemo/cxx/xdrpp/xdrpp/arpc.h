@@ -8,12 +8,18 @@
 #define SIG_FIG 10000
 #define DEFAULT_SERVER "DefaultServer"
 #define DEFAULT_PORT "DEFAULT_PORT"
-#define DISTRIBUTED_TRACING 0 // 0 for Critical path tracing, 1 for Distributed profiling
 
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
 #include <xdrpp/srpc.h>	     // XXX xdr_trace_client
 #include "../CycleTimer.h"
+
+// Global mode set with XDR Call Hdr, specified by flags on client command line.
+enum TraceMode {
+  OFF = 0,
+  TRACING = 1,
+  DISTRIBUTED_TRACING = 2,
+} trace_mode_;
 
 // A map for xid : (string, uint64_t)
 static std::unordered_map<uint32_t, std::vector<std::pair<std::string, std::uint64_t>> > xid_string_map;
@@ -56,12 +62,13 @@ public:
 
   template<typename P, typename...A>
   void invoke(const A &...a,
-	      std::function<void(call_result<typename P::res_type>)> cb, bool trace = false) {
-    rpc_msg hdr { s_.get_xid(),CALL };
+	      std::function<void(call_result<typename P::res_type>)> cb, TraceMode mode) {
+    rpc_msg hdr { s_.get_xid(), CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
     hdr.body.cbody().vers = P::interface_type::version;
     hdr.body.cbody().proc = P::proc;
+    hdr.body.cbody().trace_mode = mode;
 
     if (xdr_trace_client) {
       std::string s = "CALL ";
@@ -72,7 +79,7 @@ public:
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
 
-    s_.send_call(xdr_to_msg(hdr, a...), [cb, trace](msg_ptr m) {
+    s_.send_call(xdr_to_msg(hdr, a...), [cb, mode](msg_ptr m) {
       if (!m)
           return cb(rpc_call_stat::NETWORK_ERROR);
         
@@ -137,12 +144,13 @@ public:
 
   template<typename P, typename...A>
   void invoke(const A &...a,
-	      std::function<void(call_result<typename P::res_type>)> cb, bool trace = false) {
+	      std::function<void(call_result<typename P::res_type>)> cb, TraceMode mode) {
     rpc_msg hdr { s_.get_xid(), CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
     hdr.body.cbody().vers = P::interface_type::version;
     hdr.body.cbody().proc = P::proc;
+    hdr.body.cbody().trace_mode = mode;
 
     if (xdr_trace_client) {
       std::string s = "CALL ";
@@ -153,7 +161,7 @@ public:
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
 
-    s_.send_call(xdr_to_msg(hdr, a...), [cb, trace](msg_ptr m) {
+    s_.send_call(xdr_to_msg(hdr, a...), [cb, mode](msg_ptr m) {
       if (!m)
         return cb(rpc_call_stat::NETWORK_ERROR);
       try {
@@ -169,7 +177,7 @@ public:
         auto path_time = !path.empty() ?
                          hdr.body.rbody().areply().reply_data.success().end_time :
                          0;
-        if (trace) {
+        if (mode != OFF) { // mode == TRACING only?
           // Keep a mapping from xid to paths
           path_map_mutex.lock();
           if (xid_string_map.count(xid) == 0) {
@@ -289,9 +297,11 @@ public:
   std::string node_name_;
 
   reply_cb() {}
-  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name, std::string node_name)
+  template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name, std::string node_name, TraceMode mode)
     : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
-      s_time_(CycleTimer::currentSeconds()), node_name_(node_name) {}
+      s_time_(CycleTimer::currentSeconds()), node_name_(node_name) {
+        trace_mode_ = static_cast<TraceMode>(mode);
+      }
 
 void operator()(const type &t) const {
     double e_time = CycleTimer::currentSeconds();
@@ -306,24 +316,24 @@ void operator()(const type &t) const {
     // Find the critical path
     path_map_mutex.lock();
     time_in_sec = e_time - xid_time_map[xid];
-    if (xid_string_map.count(xid) != 0) {
-      #if DISTRIBUTED_TRACING
-      // Branch for distributed tracing
-      for (int i = 0; i < xid_string_map[xid].size(); i++) {
-        std::string curr_path = xid_string_map[xid][i].first;
-        max_path += (curr_path + "; ");
-      }
-      #else      //Branch for CPT.
-      for (int i = 0; i < xid_string_map[xid].size(); i++) {
-        std::uint64_t curr_time = xid_string_map[xid][i].second;
-        std::string curr_path = xid_string_map[xid][i].first;
-        if (curr_time > max_time) {
-          max_time = curr_time;
-          max_path = curr_path;
+    if (trace_mode_ != OFF && xid_string_map.count(xid) != 0) {
+      if (trace_mode_ == DISTRIBUTED_TRACING) {
+        // Branch for distributed tracing
+        for (int i = 0; i < xid_string_map[xid].size(); i++) {
+          std::string curr_path = xid_string_map[xid][i].first;
+          max_path += (curr_path + "; ");
+        }
+      } else {
+        // Branch for CPT.
+        for (int i = 0; i < xid_string_map[xid].size(); i++) {
+          std::uint64_t curr_time = xid_string_map[xid][i].second;
+          std::string curr_path = xid_string_map[xid][i].first;
+          if (curr_time > max_time) {
+            max_time = curr_time;
+            max_path = curr_path;
+          }
         }
       }
-      #endif
-      
     }
     path_map_mutex.unlock();
     
@@ -362,6 +372,7 @@ public:
 
   template<typename P>
   void dispatch(Session *session, rpc_msg &hdr, xdr_get &g, cb_t reply) {
+    trace_mode_ = static_cast<TraceMode>(hdr.body.cbody().trace_mode);
     wrap_transparent_ptr<typename P::arg_tuple_type> arg;
     if (!decode_arg(g, arg))
       return reply(rpc_accepted_error_msg(hdr.xid, GARBAGE_ARGS));
@@ -382,7 +393,7 @@ public:
 
     dispatch_with_session<P>(server_, session, std::move(arg),
 			     reply_cb<typename P::res_type>{
-			       hdr.xid, std::move(reply), P::proc_name(), server_.node_name_});
+			       hdr.xid, std::move(reply), P::proc_name(), server_.node_name_, trace_mode_});
   }
 
   arpc_service(T &server)

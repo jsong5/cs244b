@@ -83,6 +83,7 @@ struct call_body {
   unsigned int proc;
   opaque_auth cred;
   opaque_auth verf;
+  unsigned int trace_mode;
   /* procedure-specific parameters start here */
 };
 
