@@ -8,7 +8,6 @@
 #define SIG_FIG 10000
 #define DEFAULT_SERVER "DefaultServer"
 #define DEFAULT_PORT "DEFAULT_PORT"
-#define DISTRIBUTED_TRACING 0 // 0 for Critical path tracing, 1 for Distributed profiling
 
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
@@ -23,6 +22,10 @@ static std::unordered_map<uint32_t, double> xid_time_map;
 
 // A mutex to safegard against multiple client cb's
 static std::mutex path_map_mutex;
+
+// Flags for command line to enable CPT or distributed profiling
+extern bool is_distributed_profiling_enabled;
+extern bool is_mode_specified;
 
 namespace xdr {
 //! A \c unique_ptr to a call result, or NULL if the call failed (in
@@ -57,7 +60,7 @@ public:
   template<typename P, typename...A>
   void invoke(const A &...a,
 	      std::function<void(call_result<typename P::res_type>)> cb, bool trace = false) {
-    rpc_msg hdr { s_.get_xid(),CALL };
+    rpc_msg hdr { s_.get_xid(), CALL };
     hdr.body.cbody().rpcvers = 2;
     hdr.body.cbody().prog = P::interface_type::program;
     hdr.body.cbody().vers = P::interface_type::version;
@@ -303,27 +306,30 @@ void operator()(const type &t) const {
     std::string path = "";
     double time_in_sec = 0;
 
+    std::clog << "is_mode_enabled: " << is_mode_specified << std::endl;
+    std::clog << "is_distr: " << is_distributed_profiling_enabled << std::endl;
+
     // Find the critical path
     path_map_mutex.lock();
     time_in_sec = e_time - xid_time_map[xid];
     if (xid_string_map.count(xid) != 0) {
-      #if DISTRIBUTED_TRACING
-      // Branch for distributed tracing
-      for (int i = 0; i < xid_string_map[xid].size(); i++) {
-        std::string curr_path = xid_string_map[xid][i].first;
-        max_path += (curr_path + "; ");
-      }
-      #else      //Branch for CPT.
-      for (int i = 0; i < xid_string_map[xid].size(); i++) {
-        std::uint64_t curr_time = xid_string_map[xid][i].second;
-        std::string curr_path = xid_string_map[xid][i].first;
-        if (curr_time > max_time) {
-          max_time = curr_time;
-          max_path = curr_path;
+      if (is_distributed_profiling_enabled) {
+        // Branch for distributed tracing
+        for (int i = 0; i < xid_string_map[xid].size(); i++) {
+          std::string curr_path = xid_string_map[xid][i].first;
+          max_path += (curr_path + "; ");
+        }
+      } else {
+        // Branch for CPT.
+        for (int i = 0; i < xid_string_map[xid].size(); i++) {
+          std::uint64_t curr_time = xid_string_map[xid][i].second;
+          std::string curr_path = xid_string_map[xid][i].first;
+          if (curr_time > max_time) {
+            max_time = curr_time;
+            max_path = curr_path;
+          }
         }
       }
-      #endif
-      
     }
     path_map_mutex.unlock();
     
