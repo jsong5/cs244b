@@ -9,9 +9,6 @@
 #include <xdrpp/arpc.h>
 #include "kvprot.hh"
 
-bool is_distributed_profiling_enabled;
-bool is_mode_specified;
-
 class KVPROT1_server {
 private:
   TierServerID id_;

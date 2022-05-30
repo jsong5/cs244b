@@ -56,7 +56,7 @@ KVPROT1_master::kv_put(std::unique_ptr<Key> k, std::unique_ptr<Value> v,
   put_waiting = next_tier_connections_.size();
   for (auto it = next_tier_connections_.begin(); it != next_tier_connections_.end(); it++)
   {
-      it->second->client->kv_put(Key(*k),Value(*v), put_cb, true);
+      it->second->client->kv_put(Key(*k),Value(*v), put_cb, trace_mode_);
   }
 
   // We block on the longest request (still can process requests in parallel).
@@ -72,7 +72,7 @@ KVPROT1_master::kv_get(std::unique_ptr<Key> k, xdr::reply_cb<GetRes> cb) // Use
     get_waiting = next_tier_connections_.size();
     for (auto it = next_tier_connections_.begin(); it != next_tier_connections_.end(); it++)
     {
-        it->second->client->kv_get(Key(*k),get_cb);
+        it->second->client->kv_get(Key(*k),get_cb, trace_mode_);
     }
 
     // Block on longest request
