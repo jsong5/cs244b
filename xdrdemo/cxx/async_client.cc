@@ -20,9 +20,6 @@
 // Allows you to pretty-print XDR with <<
 using xdr::operator<<;
 
-bool is_distributed_profiling_enabled;
-bool is_mode_specified;
-
 void
 get_cb(xdr::call_result<GetRes> res)
 {
@@ -53,28 +50,24 @@ show_usage(std::string name)
 }
 
 void
-parse_cmd_line(int argc, char **argv, std::vector<std::string>& args) {
+parse_cmd_line(int argc, char **argv, std::vector<std::string>& args, TraceMode& mode) {
   for (int i = 1; i < argc; i++) {
     std::string arg = argv[i];
     if ((arg == "-h") || (arg == "--help")) {
       show_usage(argv[0]);
       exit(1);
     } else if ((arg == "-d") || (arg == "--distributed")) {
-      if (is_mode_specified) {
-        std::clog << "mode_specified already?" << std::endl;
+      if (mode != OFF) {
         show_usage(argv[0]);
         exit(1);
       }
-      is_mode_specified = true;
-      is_distributed_profiling_enabled = true;
+      mode = DISTRIBUTED_TRACING;
     } else if ((arg == "-t") || (arg == "--tracing")) {
-      if (is_mode_specified) {
-        std::clog << "mode_specified already?" << std::endl;
+      if (mode != OFF) {
         show_usage(argv[0]);
         exit(1);
       }
-      is_mode_specified = true;
-      is_distributed_profiling_enabled = false;
+      mode = TRACING;
     } else {
       args.push_back(arg);
     }
@@ -85,14 +78,12 @@ int
 main(int argc, char **argv)
 {
   std::vector<std::string> args;
-  parse_cmd_line(argc, argv, args);
+  TraceMode mode = OFF;
+  parse_cmd_line(argc, argv, args, mode);
   if (args.size() > 2) {
     show_usage(argv[0]);
     exit(1);
   }
-
-  std::clog << "is_mode_enabled: " << is_mode_specified << std::endl;
-  std::clog << "is_distr: " << is_distributed_profiling_enabled << std::endl;
 
   xdr::unique_sock fd =
     xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT).c_str());
@@ -101,7 +92,7 @@ main(int argc, char **argv)
   xdr::arpc_client<KVPROT1> client(s, "client_original");
 
   if (args.size() == 1)
-    client.kv_get(Key(args[0]), get_cb, true);
+    client.kv_get(Key(args[0]), get_cb, mode);
 
   else if (args.size() == 2)
     client.kv_put(Key(args[0]), Value(args[1]),
@@ -115,7 +106,7 @@ main(int argc, char **argv)
 		      exit(1);
 		    }
 		    exit(0);
-		  }, true);
+		  }, mode);
 
   ps.run();
   return 0;
