@@ -7,6 +7,9 @@
 #include <xdrpp/arpc.h>
 #include "kvprot.hh"
 
+bool is_distributed_profiling_enabled;
+bool is_mode_specified;
+
 struct Client_Storage {
     TierServerID server_id;
     xdr::unique_sock fd; 
