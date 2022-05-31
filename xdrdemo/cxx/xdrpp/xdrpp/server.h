@@ -26,31 +26,31 @@ extern bool xdr_trace_server;
 //! Structure that gets marshalled as an RPC success header.
 struct rpc_success_hdr {
   uint32_t xid;
-  //uint32_t tracing; //change
-  int64_t tracing;
-  explicit constexpr rpc_success_hdr(uint32_t x,int64_t y) : xid(x),tracing(y) {
-    std::cout << "X : " << xid << "Y : "<< tracing<< std::endl;
-    }
+  double e_time_;
+  xdr::xstring<> path_;
+  rpc_success_hdr(uint32_t x) : xid(x), e_time_(0.0), path_("/EMPTY/") {}
+  rpc_success_hdr(uint32_t x, double end_time, xdr::xstring<> path)
+                    : xid(x), e_time_(end_time), path_(path) {}
 };
 template<> struct xdr_traits<rpc_success_hdr> : xdr_traits_base {
   static constexpr bool valid = true;
   static constexpr bool is_class = true;
   static constexpr bool is_struct = true;
-  static constexpr bool has_fixed_size = true;
-  static constexpr std::size_t fixed_size = 32;//change
-  static constexpr std::size_t serial_size(const rpc_success_hdr &) {
-    return fixed_size;
+
+  static std::size_t serial_size(const rpc_success_hdr &t) {
+    return 32 + xdr_size(t.path_);
   }
   template<typename Archive> static void save(Archive &a,
 					      const rpc_success_hdr &t) {
-    std::cout << "save::Archive: " << std::endl;
     archive(a, t.xid, "xid");
-    archive(a, t.tracing, "tracing");
     archive(a, REPLY, "mtype");
     archive(a, MSG_ACCEPTED, "stat");
     archive(a, AUTH_NONE, "flavor");
     archive(a, uint32_t(0), "body");
     archive(a, SUCCESS, "stat");
+    archive(a, t.e_time_, "end_time");
+    archive(a, t.path_, "path");
+    std::clog << "[save] path: " << t.path_ << std::endl;
   }
 };
 

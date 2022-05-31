@@ -20,7 +20,6 @@
 // Allows you to pretty-print XDR with <<
 using xdr::operator<<;
 
-
 void
 get_cb(xdr::call_result<GetRes> res)
 {
@@ -38,26 +37,65 @@ get_cb(xdr::call_result<GetRes> res)
   exit(0);
 }
 
+void
+show_usage(std::string name)
+{
+  std::cerr << "Usage: " << name << " key [value]\n"
+            << "Options:\n"
+            << "\t-h,--help\t\tShow this help message\n"
+            << "\t-d,--distributed\t\tTurn on Distributed Profiling\n"
+            << "\t-t,--tracing\t\tTurn on Critical Path Tracing\n"
+            << "\tNote: cannot specify both d and t flags"
+            << std::endl;
+}
+
+void
+parse_cmd_line(int argc, char **argv, std::vector<std::string>& args, TraceMode& mode) {
+  for (int i = 1; i < argc; i++) {
+    std::string arg = argv[i];
+    if ((arg == "-h") || (arg == "--help")) {
+      show_usage(argv[0]);
+      exit(1);
+    } else if ((arg == "-d") || (arg == "--distributed")) {
+      if (mode != OFF) {
+        show_usage(argv[0]);
+        exit(1);
+      }
+      mode = DISTRIBUTED_TRACING;
+    } else if ((arg == "-t") || (arg == "--tracing")) {
+      if (mode != OFF) {
+        show_usage(argv[0]);
+        exit(1);
+      }
+      mode = TRACING;
+    } else {
+      args.push_back(arg);
+    }
+  }
+}
+
 int
 main(int argc, char **argv)
 {
-  if (argc < 2 || argc > 3) {
-    std::cerr << "usage: " << argv[0] << " key [value]" << std::endl;
+  std::vector<std::string> args;
+  TraceMode mode = OFF;
+  parse_cmd_line(argc, argv, args, mode);
+  if (args.size() > 2) {
+    show_usage(argv[0]);
     exit(1);
   }
 
   xdr::unique_sock fd =
-    xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT).c_str()); // basic socket for tcp
+    xdr::tcp_connect("localhost", std::to_string(XDRDEMO_PORT).c_str());
   xdr::pollset ps;
   xdr::rpc_sock s(ps, fd.release());
-  xdr::arpc_client<KVPROT1> client(s); // async rpc with application version feeing it the fd and ps we had. Inittializes client
+  xdr::arpc_client<KVPROT1> client(s, "client_original");
 
-  if (argc == 2) // this is putting
-    client.kv_get(Key(argv[1]), get_cb); // Client thing
+  if (args.size() == 1)
+    client.kv_get(Key(args[0]), get_cb, mode);
 
-  else if (argc == 3) // this is seting
-    //std::cout << "RPC error: " << argv << std::endl;
-    client.kv_put(Key(argv[1]), Value(argv[2]),
+  else if (args.size() == 2)
+    client.kv_put(Key(args[0]), Value(args[1]),
 		  [](xdr::call_result<Status> res) {
 		    if (!res) {
 		      std::cerr << "RPC error: " << res.message() << std::endl;
@@ -68,7 +106,7 @@ main(int argc, char **argv)
 		      exit(1);
 		    }
 		    exit(0);
-		  });
+		  }, mode);
 
   ps.run();
   return 0;

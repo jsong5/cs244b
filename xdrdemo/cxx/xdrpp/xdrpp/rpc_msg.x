@@ -15,10 +15,6 @@ struct opaque_auth {
   opaque body<400>;
 };
 
-struct opaque_trace {
-  opaque body<>;
-};
-
 enum msg_type {
   CALL  = 0,
   REPLY = 1
@@ -87,17 +83,20 @@ struct call_body {
   unsigned int proc;
   opaque_auth cred;
   opaque_auth verf;
-  //unsigned int tracing;
+  unsigned int trace_mode;
   /* procedure-specific parameters start here */
 };
 
 /* Reply to an RPC call that was accepted by the server: */
 struct accepted_reply {
   opaque_auth verf;
-  //unsigned int tracing;
   union switch (accept_stat stat) {
   case SUCCESS:
-    opaque results[0];
+    struct {
+      double end_time;
+      string path<>;
+      opaque results[0];
+    } success;
     /*
      * procedure-specific results start here
      */
@@ -118,13 +117,11 @@ struct accepted_reply {
 /* Reply to an RPC call that was rejected by the server: */
 union rejected_reply switch (reject_stat stat) {
  case RPC_MISMATCH:
-   //unsigned int tracing;
    struct {
      unsigned int low;
      unsigned int high;
    } mismatch_info;
  case AUTH_ERROR:
-  //unsigned int tracing;
   auth_stat rj_why;
 };
 
@@ -134,14 +131,11 @@ union reply_body switch (reply_stat stat) {
    accepted_reply areply;
  case MSG_DENIED:
    rejected_reply rreply;
-  //case TRACING_ACCEPTED:
-  // accepted_reply areply;
 };
 
 /* The RPC message: */
 struct rpc_msg {
   unsigned int xid;
-  unsigned hyper tracing;
   union switch (msg_type mtype) {
   case CALL:
     call_body cbody;
