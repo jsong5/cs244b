@@ -259,15 +259,11 @@ private:
   template<typename T> void send_reply(const T &t) {
     trace& trace = get_trace();
     std::string path = trace.first;
-    std::uint64_t quantized_time = 0;
     double raw_time = trace.second;
 
+    // Quantized time tracker
+    std::uint64_t quantized_time = std::ceil(raw_time * SIG_FIG);
     if (xdr_trace_server) {
-
-      // Quantized time tracker
-      raw_time *= SIG_FIG;
-      quantized_time = std::ceil(raw_time);
-
       std::string s = "REPLY ";
       s += proc_name_;
       s += " -> [xid " + std::to_string(xid_) + "]";
@@ -293,15 +289,12 @@ template<typename T> class reply_cb {
 public:
   using type = T;
   std::shared_ptr<impl_t> impl_;
-  double s_time_;
   std::string node_name_;
 
   reply_cb() {}
   template<typename CB> reply_cb(uint32_t xid, CB &&cb, const char *name, std::string node_name, TraceMode mode)
     : impl_(std::make_shared<impl_t>(xid, std::forward<CB>(cb), name)),
-      s_time_(CycleTimer::currentSeconds()), node_name_(node_name) {
-        trace_mode_ = static_cast<TraceMode>(mode);
-      }
+      node_name_(node_name) {}
 
 void operator()(const type &t) const {
     double e_time = CycleTimer::currentSeconds();
