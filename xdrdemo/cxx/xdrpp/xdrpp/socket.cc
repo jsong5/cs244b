@@ -1,7 +1,6 @@
 #include <cstring>
 #include <string>
 #include <xdrpp/socket.h>
-#include <iostream>
 
 namespace xdr {
 
@@ -10,7 +9,6 @@ using std::string;
 socklen_t
 socksize(const sockaddr *sa)
 {
-  std::cout << "socksize " << std::endl;
   switch (sa->sa_family) {
   case AF_INET:
     return sizeof(sockaddr_in);
@@ -62,7 +60,6 @@ namespace {
 string
 cat_host_service(const char *host, const char *service)
 {
-  std::cout << "cat_host_service " << std::endl;
   string target;
   if (host) {
     if (std::strchr(host, ':')) {
@@ -86,7 +83,6 @@ cat_host_service(const char *host, const char *service)
 unique_addrinfo get_addrinfo(const char *host, int socktype,
 			     const char *service, int family)
 {
-  std::cout << "get_addrinfo " << std::endl;
   addrinfo hints, *res;
   std::memset(&hints, 0, sizeof(hints));
   hints.ai_socktype = socktype;
@@ -102,7 +98,6 @@ unique_addrinfo get_addrinfo(const char *host, int socktype,
 void get_numinfo(const sockaddr *sa, socklen_t salen,
 		 string *host, string *serv)
 {
-  std::cout << "get_numinfo " << std::endl;
   char hostbuf[NI_MAXHOST];
   char servbuf[NI_MAXSERV];
   int err = getnameinfo(sa, salen, hostbuf, sizeof(hostbuf),
@@ -119,7 +114,6 @@ void get_numinfo(const sockaddr *sa, socklen_t salen,
 unique_sock
 tcp_connect1(const addrinfo *ai, bool ndelay)
 {
-  std::cout << "tcp_connect1 " << std::endl;
   unique_sock s(socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol));
   if (!s)
     throw_sockerr("socket");
@@ -134,7 +128,6 @@ tcp_connect1(const addrinfo *ai, bool ndelay)
 unique_sock
 tcp_connect(const addrinfo *ai)
 {
-   std::cout << "tcp_connect " << std::endl;
   unique_sock s;
   errno = EADDRNOTAVAIL;
   for (; ai && !s; ai = ai->ai_next)
@@ -146,14 +139,12 @@ tcp_connect(const addrinfo *ai)
 unique_sock
 tcp_connect(const char *host, const char *service, int family)
 {
-  std::cout << "tcp_connect " << std::endl;
   return tcp_connect(get_addrinfo(host, SOCK_STREAM, service, family));
 }
 
 unique_addrinfo
 bindable_address(const char *service, int family, int socktype)
 {
-  std::cout << "bindable_address : " <<service<<"family : "<<service<<"socktype :" <<socktype<< std::endl;
   addrinfo hints, *res;
   std::memset(&hints, 0, sizeof(hints));
   hints.ai_socktype = socktype;
@@ -168,7 +159,6 @@ bindable_address(const char *service, int family, int socktype)
 unique_sock
 tcp_listen(const char *service, int family, int backlog)
 {
-  std::cout << "tcp_listen " << std::endl;
   unique_addrinfo ai = bindable_address(service, family, SOCK_STREAM);
   unique_sock s(sock_t(socket(ai->ai_family, ai->ai_socktype,
 			      ai->ai_protocol)));
@@ -184,7 +174,6 @@ tcp_listen(const char *service, int family, int backlog)
 unique_sock
 udp_listen(const char *service, int family)
 {
-  std::cout << "udp_listen " << std::endl;
   unique_addrinfo ai = bindable_address(service, family, SOCK_DGRAM);
   unique_sock s(sock_t(socket(ai->ai_family, ai->ai_socktype,
 			      ai->ai_protocol)));
@@ -198,7 +187,6 @@ udp_listen(const char *service, int family)
 int
 socket_type(int fd)
 {
-  std::cout << "socket_type " << std::endl;
   int opt;
   socklen_t optlen = sizeof(opt);
   if (getsockopt(fd, SOL_SOCKET, SO_TYPE, &opt, &optlen) == -1)

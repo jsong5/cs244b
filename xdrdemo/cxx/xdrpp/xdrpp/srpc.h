@@ -7,6 +7,7 @@
 
 #include <xdrpp/exception.h>
 #include <xdrpp/server.h>
+#include "../CycleTimer.h"
 
 namespace xdr {
 
@@ -46,15 +47,15 @@ public:
     std::unique_ptr<typename P::res_type>>::type
   invoke(const A &...a) {
     rpc_msg hdr;
+    double start_time = CycleTimer::currentSeconds();
     prepare_call<P>(hdr);
     uint32_t xid = hdr.xid;
-
+    
     if (xdr_trace_client) {
       std::string s = "CALL ";
       s += P::proc_name();
       s += " -> [xid " + std::to_string(xid) + "]";
       s += " -> [tracing ";
-      //s += std::to_string(hdr.tracing);
       s += "]";
       std::clog << xdr_to_string(std::tie(a...), s.c_str());
     }
@@ -66,17 +67,15 @@ public:
     check_call_hdr(hdr);
     if (hdr.xid != xid)
       throw xdr_runtime_error("synchronous_client: unexpected xid");
-
+    
     pointer<typename P::res_wire_type> r;
     archive(g, r.activate());
     g.done();
+
     if (xdr_trace_client) {
       std::string s = "REPLY ";
       s += P::proc_name();
       s += " <- [xid " + std::to_string(xid) + "]";
-      s += " -> [tracing ";
-      //s += std::to_string(hdr.tracing);
-      s += "]";
       std::clog << xdr_to_string(*r, s.c_str());
     }
     return moveret(r);
@@ -155,7 +154,7 @@ public:
       std::clog << xdr_to_string(*res, s.c_str());
     }
 
-    reply(xdr_to_msg(rpc_success_hdr(hdr.xid,1000), *res));
+    reply(xdr_to_msg(rpc_success_hdr(hdr.xid, CycleTimer::currentSeconds(), "/S1/"), *res));
   }
 };
 

@@ -14,7 +14,6 @@ namespace xdr {
 
 msg_sock::~msg_sock()
 {
-  std::cout << "msg_sock::~msg_sock() :" << std::endl;
   ps_.fd_cb(s_, pollset::ReadWrite);
   close(s_);
   *destroyed_ = true;
@@ -23,7 +22,6 @@ msg_sock::~msg_sock()
 void
 msg_sock::init()
 {
-  std::cout << "msg_sock::init() :" << std::endl;
   set_nonblock(s_);
   initcb();
 }
@@ -31,7 +29,6 @@ msg_sock::init()
 void
 msg_sock::initcb()
 {
-  std::cout << "msg_sock::initcb() :" << std::endl;
   if (rcb_)
     ps_.fd_cb(s_, pollset::Read, [this](){ input(); });
   else
@@ -41,12 +38,9 @@ msg_sock::initcb()
 void
 msg_sock::input()
 {
-  std::cout << "msg_sock::input() : 1" << std::endl;
   std::shared_ptr<bool> destroyed{destroyed_};
-  for (int i = 0; i < 3 && !*destroyed; i++) {    
-    std::cout << "msg_sock::input() : i " << i<<std::endl;
+  for (int i = 0; i < 3 && !*destroyed; i++) {
     if (rdmsg_) {
-      std::cout << "msg_sock::input() : rdmsg_->size" << rdmsg_->size()<<std::endl;
       iovec iov[2];
       iov[0].iov_base = rdmsg_->data() + rdpos_;
       iov[0].iov_len = rdmsg_->size() - rdpos_;
@@ -54,35 +48,34 @@ msg_sock::input()
       iov[1].iov_len = sizeof nextlen_;
       ssize_t n = readv(s_, iov, 2);
       if (n <= 0) {
-          if (n < 0 && eagain(errno))
-            return;
-          if (n == 0)
-            errno = ECONNRESET;
-          else
-            std::cerr << "msg_sock::input: " << sock_errmsg() << std::endl;
-          rcb_(nullptr);
-          return;
+	if (n < 0 && eagain(errno))
+	  return;
+	if (n == 0)
+	  errno = ECONNRESET;
+	else
+	  std::cerr << "msg_sock::input: " << sock_errmsg() << std::endl;
+	rcb_(nullptr);
+	return;
       }
       rdpos_ += n;
       if (rdpos_ >= rdmsg_->size()) {
-        rdpos_ -= rdmsg_->size();
-        rcb_(std::move(rdmsg_));
-        if (*destroyed)
-          return;
+	rdpos_ -= rdmsg_->size();
+	rcb_(std::move(rdmsg_));
+	if (*destroyed)
+	  return;
       }
     }
     else if (rdpos_ < sizeof nextlen_) {
       ssize_t n = read(s_, nextlenp() + rdpos_, sizeof nextlen_ - rdpos_);
-      std::cout << "msg_sock::input() : Fail : rdpos_  : " << rdpos_<<",n : "<<n<<std::endl;
       if (n <= 0) {
-        if (n < 0 && eagain(errno))
-          return;
-        if (n == 0)
-          errno = rdpos_ ? ECONNRESET : 0;
-        else
-          std::cerr << "msg_sock::input: " << sock_errmsg() << std::endl;
-        rcb_(nullptr);
-        return;
+	if (n < 0 && eagain(errno))
+	  return;
+	if (n == 0)
+	  errno = rdpos_ ? ECONNRESET : 0;
+	else
+	  std::cerr << "msg_sock::input: " << sock_errmsg() << std::endl;
+	rcb_(nullptr);
+	return;
       }
       rdpos_ += n;
     }
@@ -107,7 +100,8 @@ msg_sock::input()
       // Length comes from untrusted source; don't crash if can't alloc
       try { rdmsg_ = message_t::alloc(len); }
       catch (const std::bad_alloc &) {
-	          std::cerr << "msg_sock: allocation of " << len << "-byte message failed"<< std::endl;
+	std::cerr << "msg_sock: allocation of " << len << "-byte message failed"
+		  << std::endl;
       }
     }
     else {
@@ -127,7 +121,6 @@ msg_sock::input()
 void
 msg_sock::putmsg(msg_ptr &mb)
 {
-  std::cout << "msg_sock::putmsg() :" << std::endl;
   if (wfail_) {
     mb.reset();
     return;
@@ -143,7 +136,6 @@ msg_sock::putmsg(msg_ptr &mb)
 void
 msg_sock::pop_wbytes(size_t n)
 {
-  std::cout << "msg_sock::pop_wbytes() :" << std::endl;
   if (n == 0)
     return;
   assert (n <= wsize_);
@@ -165,7 +157,6 @@ msg_sock::pop_wbytes(size_t n)
 void
 msg_sock::output(bool cbset)
 {
-  std::cout << "msg_sock::output() :" << std::endl;
   static constexpr size_t maxiov = 8;
   size_t i = 0;
   iovec v[maxiov];
@@ -199,7 +190,6 @@ msg_sock::output(bool cbset)
 void
 rpc_sock::abort_all_calls()
 {
-  std::cout << "msg_sock::abort_all_calls() :" << std::endl;
   decltype(calls_) calls(std::move(calls_));
   calls_.clear();
   for (auto &call : calls)
@@ -213,22 +203,12 @@ void
 rpc_sock::recv_msg(msg_ptr b)
 {
   if (!b || b->size() < 8) {
-    std::cout << "msg_sock::recv_msg() :Intial checks fail"<<std::endl;
     abort_all_calls();
     recv_call(nullptr);
-    return;
-  }  
-  
-  std::cout << "msg_sock::recv_msg() :b->size() :" << b->size() <<std::endl;
-  std::cout << "msg_sock::recv_msg() :b->size() :" << b->raw_data() <<std::endl;
-  std::cout << "msg_sock::recv_msg() :tracing :" << b->word(1)<<std::endl;
-  
-  if (b->word(3) == swap32le(CALL))
-  {
-    std::cout << "msg_sock::recv_msg() : CALL handling"<<std::endl;
+  }
+  else if (b->word(1) == swap32le(CALL))
     recv_call(std::move(b));
-  }else if (b->word(3) == swap32le(REPLY)) {
-    std::cout << "msg_sock::recv_msg() :REPLY handling"<<std::endl;
+  else if (b->word(1) == swap32le(REPLY)) {
     auto calli = calls_.find(b->word(0));
     if (calli == calls_.end()) {
       std::cerr << "ignoring reply to unknown call" << std::endl;
@@ -239,7 +219,6 @@ rpc_sock::recv_msg(msg_ptr b)
     cb(std::move(b));
   }
   else {
-    std::cout << "msg_sock::recv_msg() :Fail handling"<<std::endl;
     abort_all_calls();
     recv_call(nullptr);
   }
@@ -248,7 +227,6 @@ rpc_sock::recv_msg(msg_ptr b)
 void
 rpc_sock::send_call(msg_ptr &b, msg_sock::rcb_t cb)
 {
-  std::cout << "msg_sock::send_call() :" << std::endl;
   calls_.emplace(b->word(0), std::move(cb));
   ms_->putmsg(b);
 }
@@ -256,7 +234,6 @@ rpc_sock::send_call(msg_ptr &b, msg_sock::rcb_t cb)
 void
 rpc_sock::recv_call(msg_ptr b)
 {
-  std::cout << "msg_sock::recv_call() :" << std::endl;
   if (servcb_)
     servcb_(std::move(b));
   else {
